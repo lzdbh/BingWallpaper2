@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
 use crate::domain::errors::{AppError, AppResult};
-use crate::domain::models::{Settings, SettingsPatch};
+use crate::domain::models::{Settings, SettingsPatch, WallpaperStyle};
 use crate::infra::fs;
 
 /// JSON-backed settings store with atomic writes.
@@ -10,12 +10,13 @@ pub struct SettingsStore {
     path: PathBuf,
     settings: RwLock<Settings>,
     first_run: bool,
+    supported_styles: Vec<WallpaperStyle>,
 }
 
 impl SettingsStore {
-    pub fn load(path: PathBuf) -> Self {
+    pub fn load(path: PathBuf, supported_styles: Vec<WallpaperStyle>) -> Self {
         let mut first_run = false;
-        let settings = match std::fs::read(&path) {
+        let mut settings = match std::fs::read(&path) {
             Ok(bytes) => match serde_json::from_slice::<Settings>(&bytes) {
                 Ok(settings) => settings.normalized(),
                 Err(error) => {
@@ -36,12 +37,18 @@ impl SettingsStore {
             }
         };
 
+        let style_clamped = settings.clamp_style_to(&supported_styles);
+        if style_clamped {
+            log::warn!("settings.json 记录的壁纸契合度不受当前平台支持，已改用填充");
+        }
+
         let store = Self {
             path,
             settings: RwLock::new(settings.clone()),
             first_run,
+            supported_styles,
         };
-        if first_run {
+        if first_run || style_clamped {
             if let Err(error) = store.persist(&settings) {
                 log::warn!("写入默认设置失败：{error}");
             }
@@ -63,6 +70,7 @@ impl SettingsStore {
     pub fn update(&self, patch: SettingsPatch) -> AppResult<Settings> {
         let mut next = self.get();
         patch.apply_to(&mut next);
+        next.clamp_style_to(&self.supported_styles);
         self.persist(&next)?;
         if let Ok(mut guard) = self.settings.write() {
             *guard = next.clone();
@@ -71,7 +79,8 @@ impl SettingsStore {
     }
 
     pub fn set(&self, settings: Settings) -> AppResult<Settings> {
-        let normalized = settings.normalized();
+        let mut normalized = settings.normalized();
+        normalized.clamp_style_to(&self.supported_styles);
         self.persist(&normalized)?;
         if let Ok(mut guard) = self.settings.write() {
             *guard = normalized.clone();
@@ -154,5 +163,52 @@ mod tests {
         let resolved = validate_dir(target.to_str().unwrap()).unwrap();
         assert_eq!(resolved, target);
         assert!(target.is_dir());
+    }
+
+    fn write_settings(path: &Path, style: WallpaperStyle) {
+        let stored = Settings {
+            wallpaper_style: style,
+            ..Settings::default()
+        };
+        std::fs::write(path, serde_json::to_vec_pretty(&stored).unwrap()).unwrap();
+    }
+
+    #[test]
+    fn load_clamps_an_unsupported_style_and_rewrites_the_file() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("settings.json");
+        write_settings(&path, WallpaperStyle::Center);
+
+        let store = SettingsStore::load(path.clone(), vec![WallpaperStyle::Fill]);
+
+        assert_eq!(store.get().wallpaper_style, WallpaperStyle::Fill);
+        let on_disk: Settings = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(on_disk.wallpaper_style, WallpaperStyle::Fill);
+    }
+
+    #[test]
+    fn load_keeps_a_style_the_platform_supports() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("settings.json");
+        write_settings(&path, WallpaperStyle::Center);
+
+        let store = SettingsStore::load(path, WallpaperStyle::ALL.to_vec());
+
+        assert_eq!(store.get().wallpaper_style, WallpaperStyle::Center);
+    }
+
+    #[test]
+    fn update_clamps_a_style_the_platform_cannot_apply() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("settings.json");
+        let store = SettingsStore::load(path, vec![WallpaperStyle::Fill]);
+
+        let patch = SettingsPatch {
+            wallpaper_style: Some(WallpaperStyle::Span),
+            ..SettingsPatch::default()
+        };
+        let next = store.update(patch).unwrap();
+
+        assert_eq!(next.wallpaper_style, WallpaperStyle::Fill);
     }
 }

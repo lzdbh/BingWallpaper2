@@ -39,6 +39,7 @@ pub async fn get_bootstrap_state(state: State<'_, AppState>) -> AppResult<Bootst
         image_dir: state.images_dir().to_string_lossy().to_string(),
         storage,
         is_first_run: state.settings.is_first_run(),
+        scanning: state.is_scanning(),
     })
 }
 

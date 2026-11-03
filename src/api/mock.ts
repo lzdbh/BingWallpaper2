@@ -7,6 +7,9 @@ import type {
   ImageMeta,
   Page,
   PlatformCapabilities,
+  ScanFinished,
+  ScanPhase,
+  ScanProgress,
   Settings,
   SettingsPatch,
   SetWallpaperResult,
@@ -50,6 +53,7 @@ const PALETTES = [
 ]
 
 const MOCK_IMAGE_DIR = 'C:\\Users\\Demo\\Pictures\\BingWallpaper'
+const SCANNED_COUNT = 12
 
 const DEFAULT_SETTINGS: Settings = {
   imageSize: '1920x1080',
@@ -137,6 +141,32 @@ function mockImages(): ImageMeta[] {
       height: 1080,
       bytes: 620_000 + seed * 41_337,
       favorite: favorites.has(id),
+      external: false,
+      downloaded: true,
+      createdAt: `${date}T08:00:00`,
+    })
+  }
+
+  // Stand-ins for files indexed from the user's own folder: no metadata, and no
+  // thumbnail until a background scan pass has built one.
+  for (let i = 0; i < SCANNED_COUNT; i += 1) {
+    const date = today.subtract(40 + i, 'day').format('YYYY-MM-DD')
+    if (deleted.has(date)) continue
+    const seed = 40 + i
+    images.push({
+      id: 4000 - i,
+      date,
+      title: '',
+      copyright: '',
+      copyrightLink: '',
+      filePath: makeSvg(seed, 1920, 1080),
+      thumbPath: '',
+      width: 1920,
+      height: 1080,
+      bytes: 1_800_000 + seed * 10_000,
+      favorite: false,
+      external: true,
+      downloaded: true,
       createdAt: `${date}T08:00:00`,
     })
   }
@@ -145,6 +175,59 @@ function mockImages(): ImageMeta[] {
 
 let images = mockImages()
 const activeTasks = new Set<string>()
+let scanRunning = false
+
+function emitScanProgress(phase: ScanPhase, current: number, total: number, message: string) {
+  const payload: ScanProgress = {
+    phase,
+    current,
+    total,
+    percent: total > 0 ? Math.round((current / total) * 100) : 100,
+    message,
+  }
+  mockBus.emit('library://scan-progress', payload)
+}
+
+/** Mirrors `scanner::run`: index phase first, then a throttled thumbnail pass. */
+async function runScan(): Promise<boolean> {
+  if (scanRunning) return false
+  scanRunning = true
+  void (async () => {
+    const indexTotal = 4
+    for (let step = 1; step <= indexTotal; step += 1) {
+      await delay(150)
+      emitScanProgress('index', step, indexTotal, `正在导入图库 ${step}/${indexTotal}`)
+      mockBus.emit('library://changed', undefined)
+    }
+
+    const pending = images.filter((image) => !image.thumbPath)
+    for (const [index, image] of pending.entries()) {
+      await delay(40)
+      image.thumbPath = image.filePath
+      const current = index + 1
+      emitScanProgress(
+        'thumbnail',
+        current,
+        pending.length,
+        `正在生成缩略图 ${current}/${pending.length}`,
+      )
+      if (current % 3 === 0 || current === pending.length) {
+        mockBus.emit('library://changed', undefined)
+      }
+    }
+
+    const finished: ScanFinished = {
+      imported: 0,
+      relinked: 0,
+      thumbnails: pending.length,
+      failed: 0,
+      error: null,
+    }
+    scanRunning = false
+    mockBus.emit('library://scan-finished', finished)
+  })()
+  return true
+}
 
 function stats(settings: Settings) {
   return {
@@ -158,17 +241,23 @@ function loadSettings(): Settings {
   return { ...DEFAULT_SETTINGS, ...readJson<Partial<Settings>>(SETTINGS_KEY, {}) }
 }
 
+const ALL_STYLES: WallpaperStyle[] = ['fill', 'fit', 'stretch', 'tile', 'center', 'span']
+
 function capabilities(): PlatformCapabilities {
   const platform = navigator.userAgent.toLowerCase()
-  const os = platform.includes('mac')
+  const detected = platform.includes('mac')
     ? 'macos'
     : platform.includes('linux')
       ? 'linux'
       : 'windows'
+  // `?mockOs=macos` lets the browser preview exercise another platform's matrix,
+  // which is how the style-select gating is checked on a Windows dev machine.
+  const os = new URLSearchParams(window.location.search).get('mockOs') ?? detected
   return {
     os,
     arch: 'x86_64',
-    styles: ['fill', 'fit', 'stretch', 'tile', 'center', 'span'],
+    // Mirrors the Rust backends: macOS applies `fill` only, Windows/GNOME apply all.
+    styles: os === 'macos' ? ['fill'] : ALL_STYLES,
     multiMonitor: false,
     desktopEnvironment: null,
   }
@@ -245,6 +334,7 @@ export const mockApi: Api = {
       imageDir: settings.imageDir ?? MOCK_IMAGE_DIR,
       storage: stats(settings),
       isFirstRun: false,
+      scanning: scanRunning,
     }
   },
 
@@ -323,6 +413,8 @@ export const mockApi: Api = {
       height: 1080,
       bytes: 700_000 + index * 13_337,
       favorite: false,
+      external: false,
+      downloaded: true,
       createdAt: dayjs().toISOString(),
     }
     images = [image, ...images.filter((item) => item.date !== date)].sort((a, b) =>
@@ -380,9 +472,14 @@ export const mockApi: Api = {
 
   async updateSettings(patch: SettingsPatch): Promise<Settings> {
     await delay(140)
-    const next = { ...loadSettings(), ...patch }
+    const previous = loadSettings()
+    const next = { ...previous, ...patch }
     writeJson(SETTINGS_KEY, next)
     mockBus.emit('settings://changed', next)
+    // Mirrors `apply_settings_side_effects`: a new gallery directory is re-indexed.
+    if (patch.imageDir !== undefined && patch.imageDir !== previous.imageDir) {
+      void runScan()
+    }
     return next
   },
 
@@ -413,7 +510,8 @@ export const mockApi: Api = {
     const settings = loadSettings()
     const cutoff = dayjs().subtract(settings.retentionDays, 'day')
     const removable = images.filter(
-      (image) => !image.favorite && dayjs(image.date).isBefore(cutoff, 'day'),
+      (image) =>
+        !image.favorite && !image.external && dayjs(image.date).isBefore(cutoff, 'day'),
     )
     const deleted = new Set(readJson<string[]>(DELETED_KEY, []))
     removable.forEach((image) => deleted.add(image.date))
@@ -423,6 +521,10 @@ export const mockApi: Api = {
       removed: removable.length,
       bytesFreed: removable.reduce((sum, image) => sum + image.bytes, 0),
     }
+  },
+
+  async rescanLibrary(): Promise<boolean> {
+    return runScan()
   },
 
   async showMainWindow(): Promise<void> {

@@ -19,6 +19,7 @@
 - **每日壁纸**：自动拉取 Bing 当日图片，下载后按所选填充模式应用到桌面。
 - **四种分辨率**：UHD 4K、1920×1200、1920×1080（默认）、1366×768。
 - **图库**：分页、搜索、全部 / 收藏 / 最近 7 天筛选、列表与网格两种视图。
+- **图库目录扫描**：把保存目录指向已有壁纸的文件夹，应用会自动索引、补齐缩略图并显示进度；扫描来的图片只建索引，从图库删除不会动你的原文件。
 - **批量下载**：按日期区间下载最近 8 天内的图片，带进度、取消与跳过已存在项。
 - **定时任务**：每天在指定时间设置壁纸；错过后可补跑（catch-up）。
 - **托盘常驻**：显示主窗口、立即设置、打开图库、打开设置、退出。
@@ -109,7 +110,7 @@ npm run tauri:build
 
 | 检查 | 命令 | 说明 |
 |---|---|---|
-| 前端单元测试 | `npm run test:unit` | Vitest + jsdom，覆盖 `utils/format`、`utils/error`、`stores/settings`（27 用例） |
+| 前端单元测试 | `npm run test:unit` | Vitest + jsdom，覆盖 `utils/format`、`utils/error`、`stores/settings`、`stores/gallery`（34 用例） |
 | 前端类型检查 | `npm run build` | `vite build` + `vue-tsc --noEmit` |
 | Rust 静态检查 | `cd src-tauri && cargo clippy --all-targets -- -D warnings` | 零警告门禁 |
 | Rust 测试 | `cd src-tauri && cargo test` | 单元测试 + wiremock 集成测试（Bing 正常 / 空 / 500 / 畸形 JSON） |
@@ -119,7 +120,7 @@ npm run tauri:build
 CI（`.github/workflows/`）：
 
 - `ci.yml`：push / PR 时在 **Windows(MSVC) / Ubuntu / macOS** 上运行 clippy `-D warnings`、`cargo test`、前端 build + Vitest——本机 GNU 跑不了的后端测试由 CI 实跑。
-- `release.yml`：推送 `v*` tag 时六平台**原生**打包（`windows-latest`、`windows-11-arm`、`macos-latest`、`macos-15-intel`、`ubuntu-22.04`、`ubuntu-24.04-arm`），产出草稿 Release。
+- `release.yml`：推送 `v*` tag 时按 **Windows x64、macOS arm64、macOS x64** 三个原生 runner 打包，产出草稿 Release。
 
 交叉编译 arm64：
 
@@ -168,6 +169,8 @@ npm run tauri:build -- --target aarch64-unknown-linux-gnu
 | 其他 X11 | `feh` | 全部 |
 
 开机自启统一为**用户级**：Windows `HKCU\...\Run`、macOS LaunchAgent、Linux XDG autostart，无需管理员权限。
+
+当前平台不支持的契合度在设置页会置灰；早期版本存进 `settings.json` 的不支持值会在启动时被自动改回**填充**并回写文件，避免定时任务每次都设置失败。
 
 ## 文档
 

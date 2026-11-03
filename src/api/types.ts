@@ -3,6 +3,7 @@ export type WallpaperStyle = 'fill' | 'fit' | 'stretch' | 'tile' | 'center' | 's
 export type ThemeMode = 'system' | 'light' | 'dark'
 export type UpdateChannel = 'stable' | 'beta'
 export type ImageFilter = 'all' | 'favorites' | 'recent'
+export type ScanPhase = 'index' | 'thumbnail'
 
 export interface ImageMeta {
   id: number
@@ -16,6 +17,10 @@ export interface ImageMeta {
   height: number
   bytes: number
   favorite: boolean
+  /** Indexed from a user directory: removing it never deletes the file. */
+  external: boolean
+  /** The recorded file is still on disk; false means it went missing. */
+  downloaded: boolean
   createdAt: string
 }
 
@@ -69,6 +74,8 @@ export interface BootstrapState {
   imageDir: string
   storage: StorageStats
   isFirstRun: boolean
+  /** A directory scan is already running when the window opens. */
+  scanning: boolean
 }
 
 export interface SetWallpaperResult {
@@ -92,6 +99,22 @@ export interface DownloadFinished {
   failed: number
   skipped: number
   message: string
+}
+
+export interface ScanProgress {
+  phase: ScanPhase
+  current: number
+  total: number
+  percent: number
+  message: string
+}
+
+export interface ScanFinished {
+  imported: number
+  relinked: number
+  thumbnails: number
+  failed: number
+  error: string | null
 }
 
 export interface UpdateInfo {
@@ -137,6 +160,8 @@ export interface Api {
   checkUpdate(): Promise<UpdateInfo | null>
   installUpdate(): Promise<void>
   clearCache(): Promise<ClearCacheResult>
+  /** Ask the backend to re-index the gallery directory. `false` = a pass is already running. */
+  rescanLibrary(): Promise<boolean>
   showMainWindow(): Promise<void>
   quitApp(): Promise<void>
 }

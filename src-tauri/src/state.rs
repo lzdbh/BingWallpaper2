@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_autostart::ManagerExt;
 
 use crate::domain::errors::{AppError, AppResult};
@@ -28,6 +28,8 @@ pub struct AppState {
     pub last_update: Mutex<Option<UpdateInfo>>,
     pub version: String,
     images_dir: RwLock<PathBuf>,
+    /// Set while a directory scan (and the thumbnail pass it schedules) runs.
+    library_scan_running: Arc<AtomicBool>,
 }
 
 impl AppState {
@@ -42,13 +44,16 @@ impl AppState {
         fs::ensure_dir(&thumbs_dir)?;
 
         let db = Db::open(&data_dir.join("library.db"))?;
-        let settings = SettingsStore::load(data_dir.join("settings.json"));
+        let backend = platform::create_backend();
+        let settings = SettingsStore::load(
+            data_dir.join("settings.json"),
+            backend.capabilities().styles,
+        );
         let current = settings.get();
         let images_dir = resolve_image_dir(&data_dir, &current);
         fs::ensure_dir(&images_dir)?;
 
         let http = HttpClient::new(current.proxy.as_deref())?;
-        let backend = platform::create_backend();
         let version = app.package_info().version.to_string();
 
         let state = Self {
@@ -64,6 +69,7 @@ impl AppState {
             last_update: Mutex::new(None),
             version,
             images_dir: RwLock::new(images_dir.clone()),
+            library_scan_running: Arc::new(AtomicBool::new(false)),
         };
 
         state.allow_asset_dir(&data_dir);
@@ -94,6 +100,40 @@ impl AppState {
 
     pub fn wallpaper(&self) -> WallpaperService<'_> {
         WallpaperService::new(self.backend.as_ref(), &self.db)
+    }
+
+    /// Index the configured directory and top up thumbnails in the background.
+    /// Returns false when a pass is already running, so the gallery button and
+    /// startup both stay idempotent.
+    pub fn spawn_library_scan(&self) -> bool {
+        let running = self.library_scan_running.clone();
+        if running
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            return false;
+        }
+
+        let app = self.app.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Err(error) = crate::services::scanner::run(app.clone()).await {
+                log::warn!("图库扫描失败：{error}");
+                let _ = app.emit(
+                    "library://scan-finished",
+                    crate::domain::models::ScanFinished {
+                        error: Some(error.to_string()),
+                        ..Default::default()
+                    },
+                );
+            }
+            running.store(false, Ordering::SeqCst);
+        });
+
+        true
+    }
+
+    pub fn is_scanning(&self) -> bool {
+        self.library_scan_running.load(Ordering::SeqCst)
     }
 
     pub fn register_download(&self, task_id: &str) -> Arc<AtomicBool> {
@@ -137,6 +177,9 @@ impl AppState {
                 *guard = dir.clone();
             }
             self.allow_asset_dir(&dir);
+            // Whatever already sits in the new directory has to be indexed before
+            // the gallery can show it.
+            self.spawn_library_scan();
         }
 
         if previous.auto_start != next.auto_start {

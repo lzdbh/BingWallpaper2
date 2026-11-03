@@ -16,8 +16,8 @@ import { useSettingsStore } from '@/stores/settings'
 import { useWallpaperStore } from '@/stores/wallpaper'
 import {
   IMAGE_SIZE_OPTIONS,
-  WALLPAPER_STYLE_VALUES,
   assetUrl,
+  buildStyleOptions,
   formatDate,
   formatWeekday,
   sizeLabel,
@@ -47,10 +47,7 @@ const storyText = computed(
 
 const sizeOptions = IMAGE_SIZE_OPTIONS.map((option) => ({ ...option }))
 const styleOptions = computed(() =>
-  WALLPAPER_STYLE_VALUES.map((style) => ({
-    value: style,
-    label: t(styleLabelKey(style)),
-  })),
+  buildStyleOptions(app.capabilities.styles, (style) => t(styleLabelKey(style))),
 )
 
 const imageSize = computed({

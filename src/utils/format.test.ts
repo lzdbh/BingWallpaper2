@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import type { ImageSize } from '@/api/types'
 import {
   assetUrl,
+  buildStyleOptions,
   formatBytes,
   formatDate,
   formatDateShort,
   formatWeekday,
   sizeLabel,
   styleLabelKey,
+  WALLPAPER_STYLE_VALUES,
 } from './format'
 
 describe('formatBytes', () => {
@@ -64,6 +66,35 @@ describe('styleLabelKey', () => {
     expect(styleLabelKey('fill')).toBe('home.styleFill')
     expect(styleLabelKey('stretch')).toBe('home.styleStretch')
     expect(styleLabelKey('center')).toBe('home.styleCenter')
+  })
+})
+
+describe('buildStyleOptions', () => {
+  const label = (style: string) => style
+
+  it('keeps every style visible and preserves the canonical order', () => {
+    const options = buildStyleOptions(WALLPAPER_STYLE_VALUES, label)
+    expect(options.map((option) => option.value)).toEqual(WALLPAPER_STYLE_VALUES)
+    expect(options.every((option) => option.disabled === false)).toBe(true)
+  })
+
+  it('greys out styles the platform cannot apply', () => {
+    const options = buildStyleOptions(['fill'], label)
+    expect(options.filter((option) => !option.disabled).map((option) => option.value)).toEqual([
+      'fill',
+    ])
+    expect(options.filter((option) => option.disabled).map((option) => option.value)).toEqual([
+      'fit',
+      'stretch',
+      'tile',
+      'center',
+      'span',
+    ])
+  })
+
+  it('uses the supplied label builder for each option', () => {
+    const options = buildStyleOptions(['fill'], (style) => `home.style:${style}`)
+    expect(options[0]?.label).toBe('home.style:fill')
   })
 })
 

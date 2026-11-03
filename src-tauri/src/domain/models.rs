@@ -84,6 +84,37 @@ pub enum ImageFilter {
     Recent,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ScanPhase {
+    #[default]
+    Index,
+    Thumbnail,
+}
+
+/// Progress of the background library scan (indexing files, then building thumbs).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanProgress {
+    pub phase: ScanPhase,
+    pub current: u32,
+    pub total: u32,
+    pub percent: u32,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanFinished {
+    pub imported: u32,
+    pub relinked: u32,
+    pub thumbnails: u32,
+    pub failed: u32,
+    /// Set instead of the counters when the pass aborted; the gallery shows it
+    /// as a warning and stops the progress bar.
+    pub error: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImageMeta {
@@ -98,6 +129,12 @@ pub struct ImageMeta {
     pub height: u32,
     pub bytes: u64,
     pub favorite: bool,
+    /// The file lives in a user-selected directory instead of the app-managed
+    /// image dir, so cleanup and delete must never touch it on disk.
+    pub external: bool,
+    /// Derived when the row is read: `file_path` still points at a real file.
+    /// A row can only go stale if the picture was removed outside the app.
+    pub downloaded: bool,
     pub created_at: String,
 }
 
@@ -168,6 +205,18 @@ impl Settings {
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty());
         self
+    }
+
+    /// Replace a style the current platform cannot apply with `fill`, returning
+    /// whether the stored value had to change. Builds before the UI gated styles
+    /// could persist a mode that the backend rejects, which then failed every
+    /// scheduled apply.
+    pub fn clamp_style_to(&mut self, supported: &[WallpaperStyle]) -> bool {
+        if supported.contains(&self.wallpaper_style) {
+            return false;
+        }
+        self.wallpaper_style = WallpaperStyle::default();
+        true
     }
 }
 
@@ -322,6 +371,8 @@ pub struct BootstrapState {
     pub image_dir: String,
     pub storage: StorageStats,
     pub is_first_run: bool,
+    /// A gallery-directory scan is still running when the window opens.
+    pub scanning: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

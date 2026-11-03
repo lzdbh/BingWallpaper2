@@ -25,6 +25,8 @@ export const useAppStore = defineStore('app', () => {
   const imageDir = ref('')
   const storage = ref<StorageStats>({ count: 0, favoriteCount: 0, bytes: 0 })
   const isFirstRun = ref(false)
+  /** Whether the backend was still indexing the gallery directory at bootstrap. */
+  const scanning = ref(false)
   const update = ref<UpdateInfo | null>(null)
   const checkingUpdate = ref(false)
   const installing = ref(false)
@@ -51,6 +53,7 @@ export const useAppStore = defineStore('app', () => {
       imageDir.value = state.imageDir
       storage.value = state.storage
       isFirstRun.value = state.isFirstRun
+      scanning.value = state.scanning
       useSettingsStore().apply(state.settings)
       if (state.today) useWallpaperStore().apply(state.today)
       ready.value = true
@@ -106,6 +109,7 @@ export const useAppStore = defineStore('app', () => {
     imageDir,
     storage,
     isFirstRun,
+    scanning,
     update,
     checkingUpdate,
     installing,

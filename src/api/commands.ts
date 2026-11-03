@@ -42,6 +42,7 @@ export const realApi: Api = {
   checkUpdate: () => invoke<UpdateInfo | null>('check_update'),
   installUpdate: () => invoke<void>('install_update'),
   clearCache: () => invoke<ClearCacheResult>('clear_cache'),
+  rescanLibrary: () => invoke<boolean>('rescan_library'),
   showMainWindow: () => invoke<void>('show_main_window'),
   quitApp: () => invoke<void>('quit_app'),
 }

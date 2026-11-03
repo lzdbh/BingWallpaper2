@@ -116,14 +116,13 @@ impl<'a> LibraryService<'a> {
             AppError::Io(format!("无法保存图片 {}：{error}", file_path.display()))
         })?;
 
-        let thumb_path = self.thumbs_dir.join(format!("{}.jpg", image.date));
-        if let Err(error) = thumbnail::generate(&file_path, &thumb_path, 960) {
-            log::warn!("生成缩略图失败：{error}");
-        }
-        let thumb = if thumb_path.is_file() {
-            thumb_path.to_string_lossy().to_string()
-        } else {
-            String::new()
+        let thumb_path = thumbnail::thumb_path_for(&self.thumbs_dir, &image.date);
+        let thumb = match thumbnail::generate(&file_path, &thumb_path, thumbnail::THUMB_WIDTH) {
+            Ok(()) => thumb_path.to_string_lossy().to_string(),
+            Err(error) => {
+                log::warn!("生成缩略图失败：{error}");
+                String::new()
+            }
         };
 
         let previous = self.db.get_by_date(&image.date)?;
@@ -141,6 +140,7 @@ impl<'a> LibraryService<'a> {
             height,
             bytes: bytes.len() as u64,
             created_at: &created_at,
+            external: false,
         };
 
         let meta = match self.db.upsert(&new_image) {
@@ -151,7 +151,9 @@ impl<'a> LibraryService<'a> {
             }
         };
 
-        if let Some(previous) = previous {
+        // Only discard the copy this app wrote; a scanned row points at a file the
+        // user keeps in their own directory.
+        if let Some(previous) = previous.filter(|image| !image.external) {
             if previous.file_path != meta.file_path {
                 let _ = fs::remove_file(Path::new(&previous.file_path));
             }
@@ -160,16 +162,32 @@ impl<'a> LibraryService<'a> {
         Ok(meta)
     }
 
-    /// Delete the local files and database row for an image.
+    /// Delete the local files and database row for an image. Scanned images are
+    /// only un-indexed: their files stay where the user put them, and the path is
+    /// tombstoned so the next scan does not bring them back.
     pub fn remove(&self, id: i64) -> AppResult<Option<ImageMeta>> {
-        let removed = self.db.delete(id)?;
-        if let Some(image) = &removed {
-            let _ = fs::remove_file(Path::new(&image.file_path));
+        let Some(image) = self.db.get_by_id(id)? else {
+            return Ok(None);
+        };
+
+        if image.external {
+            if !self.db.forget(id, &image.file_path)? {
+                return Ok(None);
+            }
             if !image.thumb_path.is_empty() {
                 let _ = fs::remove_file(Path::new(&image.thumb_path));
             }
+            return Ok(Some(image));
         }
-        Ok(removed)
+
+        if self.db.delete(id)?.is_none() {
+            return Ok(None);
+        }
+        let _ = fs::remove_file(Path::new(&image.file_path));
+        if !image.thumb_path.is_empty() {
+            let _ = fs::remove_file(Path::new(&image.thumb_path));
+        }
+        Ok(Some(image))
     }
 }
 

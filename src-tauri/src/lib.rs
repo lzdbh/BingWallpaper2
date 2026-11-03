@@ -28,7 +28,13 @@ pub fn run() {
             let state = state::AppState::new(&handle)?;
             app.manage(state);
             tray::create(&handle)?;
-            services::scheduler::spawn(handle);
+            services::scheduler::spawn(handle.clone());
+            // Index whatever already sits in the gallery directory before the
+            // window asks for it; a short delay keeps first paint fast.
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                handle.state::<state::AppState>().spawn_library_scan();
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -45,6 +51,7 @@ pub fn run() {
             commands::gallery::list_images,
             commands::gallery::toggle_favorite,
             commands::gallery::delete_image,
+            commands::gallery::rescan_library,
             commands::download::download_image,
             commands::download::download_range,
             commands::download::cancel_download,

@@ -35,3 +35,10 @@ pub async fn delete_image(state: State<'_, AppState>, id: i64) -> AppResult<()> 
     state.app.emit("library://changed", ()).ok();
     Ok(())
 }
+
+/// Re-index the configured gallery directory. Returns false when a pass is
+/// already running.
+#[tauri::command]
+pub async fn rescan_library(state: State<'_, AppState>) -> AppResult<bool> {
+    Ok(state.spawn_library_scan())
+}

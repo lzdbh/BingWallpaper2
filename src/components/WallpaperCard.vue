@@ -27,6 +27,8 @@ const { t, locale } = useI18n()
 const thumb = computed(() => assetUrl(props.image.thumbPath || props.image.filePath))
 const preview = computed(() => ({ src: assetUrl(props.image.filePath) }))
 const dateLabel = computed(() => formatDateShort(props.image.date, locale.value))
+// Scanned files carry no Bing metadata, so the date stands in for the title.
+const titleText = computed(() => props.image.title || dateLabel.value)
 </script>
 
 <template>
@@ -35,7 +37,8 @@ const dateLabel = computed(() => formatDateShort(props.image.date, locale.value)
       <a-image
         :src="thumb"
         :preview="preview"
-        :alt="image.title"
+        :alt="titleText"
+        decoding="async"
         :root-class-name="'card-image'"
       />
       <span class="date-badge">{{ dateLabel }}</span>
@@ -55,9 +58,6 @@ const dateLabel = computed(() => formatDateShort(props.image.date, locale.value)
           <ThunderboltOutlined />
           {{ t('gallery.setFromCard') }}
         </a-button>
-        <a-button size="small" :title="t('common.download')" @click.stop="emit('download', image)">
-          <DownloadOutlined />
-        </a-button>
         <a-button
           size="small"
           danger
@@ -67,15 +67,31 @@ const dateLabel = computed(() => formatDateShort(props.image.date, locale.value)
           <DeleteOutlined />
         </a-button>
       </div>
+
+      <!-- Every gallery entry is a local file, so the download action only earns a
+          permanent place once the file has gone missing outside the app. -->
+      <a-button
+        v-if="!image.downloaded"
+        class="download-missing"
+        type="primary"
+        size="small"
+        @click.stop="emit('download', image)"
+      >
+        <DownloadOutlined />
+        {{ t('common.download') }}
+      </a-button>
     </div>
 
     <div class="meta">
-      <h3 class="card-title ellipsis" :title="image.title">{{ image.title }}</h3>
-      <p class="card-copy ellipsis" :title="image.copyright">{{ image.copyright }}</p>
+      <h3 class="card-title ellipsis" :title="titleText">{{ titleText }}</h3>
+      <p v-if="image.copyright" class="card-copy ellipsis" :title="image.copyright">
+        {{ image.copyright }}
+      </p>
       <div class="card-tags">
         <span>{{ image.date }}</span>
         <span class="sep">·</span>
         <span>{{ formatBytes(image.bytes) }}</span>
+        <span v-if="image.external" class="tag-external">{{ t('gallery.externalTag') }}</span>
       </div>
     </div>
   </article>
@@ -191,6 +207,14 @@ const dateLabel = computed(() => formatDateShort(props.image.date, locale.value)
   transform: translateY(0);
 }
 
+.download-missing {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 2;
+  box-shadow: var(--bw-shadow-soft);
+}
+
 .meta {
   padding: 11px 13px 12px;
   min-width: 0;
@@ -221,5 +245,13 @@ const dateLabel = computed(() => formatDateShort(props.image.date, locale.value)
 
 .sep {
   opacity: 0.5;
+}
+
+.tag-external {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bw-primary-soft);
+  color: var(--bw-primary);
+  font-weight: 600;
 }
 </style>

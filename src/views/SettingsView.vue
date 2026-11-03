@@ -29,8 +29,8 @@ import { useSettingsStore } from '@/stores/settings'
 import { useWallpaperStore } from '@/stores/wallpaper'
 import {
   IMAGE_SIZE_OPTIONS,
-  WALLPAPER_STYLE_VALUES,
   assetUrl,
+  buildStyleOptions,
   formatBytes,
   styleLabelKey,
 } from '@/utils/format'
@@ -148,10 +148,7 @@ const autoText = computed(() =>
 
 const sizeOptions = IMAGE_SIZE_OPTIONS.map((option) => ({ ...option }))
 const styleOptions = computed(() =>
-  WALLPAPER_STYLE_VALUES.map((style) => ({
-    value: style,
-    label: t(styleLabelKey(style)),
-  })),
+  buildStyleOptions(app.capabilities.styles, (style) => t(styleLabelKey(style))),
 )
 const themeOptions = computed(() => [
   { value: 'system', label: t('settings.themeSystem') },
@@ -296,7 +293,7 @@ function resetSettings() {
           <SettingRow :label="t('settings.imageSize')">
             <a-select v-model:value="imageSize" :options="sizeOptions" class="w-180" />
           </SettingRow>
-          <SettingRow :label="t('settings.style')">
+          <SettingRow :label="t('settings.style')" :hint="t('settings.styleHint')">
             <a-select v-model:value="wallpaperStyle" :options="styleOptions" class="w-180" />
           </SettingRow>
           <SettingRow :label="t('settings.saveDir')" :hint="t('settings.saveDirHint')">

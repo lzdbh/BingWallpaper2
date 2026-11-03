@@ -65,6 +65,27 @@ export function styleLabelKey(style: WallpaperStyle): string {
   return `home.style${style.charAt(0).toUpperCase()}${style.slice(1)}`
 }
 
+export interface StyleOption {
+  value: WallpaperStyle
+  label: string
+  disabled: boolean
+}
+
+/**
+ * Options for the wallpaper-style select. `supported` comes from the platform
+ * capability matrix; styles the current OS cannot apply stay visible but disabled.
+ */
+export function buildStyleOptions(
+  supported: WallpaperStyle[],
+  labelOf: (style: WallpaperStyle) => string,
+): StyleOption[] {
+  return WALLPAPER_STYLE_VALUES.map((style) => ({
+    value: style,
+    label: labelOf(style),
+    disabled: !supported.includes(style),
+  }))
+}
+
 export function sizeLabel(size: ImageSize): string {
   return IMAGE_SIZE_OPTIONS.find((option) => option.value === size)?.label ?? size
 }

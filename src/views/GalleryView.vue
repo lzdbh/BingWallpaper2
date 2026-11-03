@@ -9,6 +9,7 @@ import {
   HeartOutlined,
   HddOutlined,
   PictureOutlined,
+  ReloadOutlined,
   SearchOutlined,
 } from '@ant-design/icons-vue'
 import { api } from '@/api'
@@ -50,16 +51,59 @@ const autoText = computed(() =>
   settings.settings.autoSet ? settings.settings.autoSetTime : t('home.disabled'),
 )
 
+const scanPercent = computed(() => gallery.scanProgress?.percent ?? 0)
+
+const showSkeleton = computed(
+  () => (gallery.loading || gallery.scanning) && gallery.items.length === 0,
+)
+
+// Built from the structured payload: the backend `message` is Chinese-only.
+const scanLabel = computed(() => {
+  const progress = gallery.scanProgress
+  if (!progress) return t('gallery.scanStarting')
+  return progress.phase === 'index'
+    ? t('gallery.scanIndexing', { current: progress.current, total: progress.total })
+    : t('gallery.scanThumbnails', { current: progress.current, total: progress.total })
+})
+
+const scanSummary = computed(() => {
+  const result = gallery.scanResult
+  if (!result) return ''
+  return t('gallery.scanDone', {
+    imported: result.imported,
+    relinked: result.relinked,
+    thumbnails: result.thumbnails,
+    failed: result.failed,
+  })
+})
+
+const hasScanResult = computed(() => {
+  const result = gallery.scanResult
+  return Boolean(
+    result &&
+      (result.imported > 0 || result.relinked > 0 || result.thumbnails > 0 || result.failed > 0),
+  )
+})
+
 watch(searchInput, (value) => {
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => void gallery.setQuery(value), 320)
 })
 
 onMounted(() => {
+  void gallery.init()
   void gallery.load()
 })
 
 onBeforeUnmount(() => clearTimeout(searchTimer))
+
+async function onRescan() {
+  try {
+    if (!(await gallery.rescan())) message.info(t('gallery.scanBusy'))
+  } catch (e) {
+    message.error(errorText(e))
+  }
+}
 
 function onFilter(value: string | number) {
   void gallery.setFilter(value as ImageFilter)
@@ -108,7 +152,7 @@ async function download(image: ImageMeta) {
 function confirmDelete(image: ImageMeta) {
   Modal.confirm({
     title: t('gallery.deleteConfirm'),
-    content: t('gallery.deleteHint'),
+    content: image.external ? t('gallery.deleteHintExternal') : t('gallery.deleteHint'),
     okText: t('common.delete'),
     okType: 'danger',
     cancelText: t('common.cancel'),
@@ -141,6 +185,10 @@ function goPage(page: number) {
         <p>{{ t('gallery.subtitle') }}</p>
       </div>
       <div class="page-actions">
+        <a-button :loading="gallery.scanning" @click="onRescan">
+          <ReloadOutlined v-if="!gallery.scanning" />
+          {{ t('gallery.rescan') }}
+        </a-button>
         <a-button @click="openFolder">
           <FolderOpenOutlined />
           {{ t('common.openFolder') }}
@@ -198,6 +246,25 @@ function goPage(page: number) {
       </div>
     </section>
 
+    <div v-if="gallery.scanning" class="scan-panel glass">
+      <div class="scan-head">
+        <ReloadOutlined spin />
+        <span class="scan-label">{{ scanLabel }}</span>
+        <span class="scan-percent">{{ scanPercent }}%</span>
+      </div>
+      <a-progress :percent="scanPercent" size="small" :show-info="false" />
+    </div>
+
+    <a-alert
+      v-else-if="hasScanResult"
+      type="success"
+      show-icon
+      closable
+      class="gallery-alert"
+      :message="scanSummary"
+      @close="gallery.scanResult = null"
+    />
+
     <a-alert
       v-if="gallery.error"
       type="error"
@@ -211,22 +278,28 @@ function goPage(page: number) {
       </template>
     </a-alert>
 
-    <div v-if="gallery.loading && !gallery.items.length" class="skeleton-grid">
+    <div v-if="showSkeleton" class="skeleton-grid">
       <div v-for="n in 8" :key="n" class="skeleton-card glass">
         <a-skeleton active :paragraph="{ rows: 2 }" />
       </div>
     </div>
 
     <EmptyState
-      v-else-if="gallery.isEmpty"
+      v-else-if="gallery.isEmpty && !gallery.scanning"
       :icon="PictureOutlined"
       :title="gallery.query ? t('gallery.searchEmpty') : t('gallery.emptyTitle')"
       :hint="gallery.query ? t('gallery.searchEmptyHint') : t('gallery.emptyHint')"
     >
       <template #action>
-        <a-button type="primary" @click="goDownloads">
-          {{ t('gallery.goDownload') }}
-        </a-button>
+        <div class="empty-actions">
+          <a-button @click="onRescan">
+            <ReloadOutlined />
+            {{ t('gallery.rescan') }}
+          </a-button>
+          <a-button type="primary" @click="goDownloads">
+            {{ t('gallery.goDownload') }}
+          </a-button>
+        </div>
       </template>
     </EmptyState>
 
@@ -352,6 +425,46 @@ function goPage(page: number) {
 
 .gallery-alert {
   border-radius: 12px;
+}
+
+.scan-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px 14px;
+  border-radius: var(--bw-radius);
+}
+
+.scan-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--bw-ink);
+}
+
+.scan-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.scan-percent {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--bw-muted);
+}
+
+.scan-panel :deep(.ant-progress) {
+  margin: 0;
+}
+
+.empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .gallery-grid {

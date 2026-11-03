@@ -1,5 +1,6 @@
 pub mod bing;
 pub mod library;
+pub mod scanner;
 pub mod scheduler;
 pub mod settings;
 pub mod thumbnail;

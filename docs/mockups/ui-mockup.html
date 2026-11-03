@@ -1,0 +1,1043 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BingWallpaper 跨平台复刻 · 界面示意</title>
+<style>
+  :root {
+    --blue: #1677ff;
+    --blue-deep: #0958d9;
+    --ink: #101828;
+    --muted: #667085;
+    --line: rgba(16, 24, 40, .08);
+    --glass: rgba(255, 255, 255, .78);
+    --glass-strong: rgba(255, 255, 255, .92);
+    --glass-dark: rgba(12, 18, 28, .52);
+    --shadow: 0 18px 50px rgba(16, 24, 40, .18);
+    --radius: 18px;
+    --font: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 600px at 20% -10%, rgba(22, 119, 255, .18), transparent 60%),
+      radial-gradient(900px 500px at 90% 10%, rgba(0, 196, 204, .10), transparent 55%),
+      #0b0e13;
+    min-height: 100vh;
+  }
+  .page-head {
+    max-width: 1520px;
+    margin: 0 auto;
+    padding: 42px 40px 18px;
+    color: #fff;
+  }
+  .page-head .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+    color: rgba(255,255,255,.55);
+  }
+  .page-head .eyebrow::before {
+    content: ""; width: 22px; height: 1px; background: rgba(255,255,255,.35);
+  }
+  .page-head h1 {
+    margin: 10px 0 6px; font-size: 30px; letter-spacing: -.02em; font-weight: 650;
+  }
+  .page-head p {
+    margin: 0; color: rgba(255,255,255,.55); font-size: 14px; line-height: 1.7;
+  }
+  .canvas {
+    max-width: 1520px; margin: 0 auto; padding: 22px 40px 80px;
+    display: flex; flex-direction: column; gap: 34px;
+  }
+  .shot { display: flex; flex-direction: column; gap: 12px; }
+  .shot-label {
+    display: flex; align-items: baseline; gap: 12px;
+    color: rgba(255,255,255,.72); font-size: 13px; letter-spacing: .02em;
+  }
+  .shot-label b { color: #fff; font-size: 14px; font-weight: 600; }
+  .shot-label span { color: rgba(255,255,255,.38); font-size: 12px; }
+  .frame {
+    position: relative; width: 1440px; height: 900px; flex: none;
+    border-radius: 22px; overflow: hidden; isolation: isolate;
+    box-shadow: 0 40px 100px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08);
+    background: #f5f7fb;
+  }
+  .glass {
+    background: var(--glass);
+    border: 1px solid rgba(255,255,255,.55);
+    box-shadow: 0 8px 30px rgba(16,24,40,.12);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+  }
+  .glass-dark {
+    background: var(--glass-dark);
+    border: 1px solid rgba(255,255,255,.16);
+    box-shadow: 0 8px 30px rgba(0,0,0,.18);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+  }
+  svg.icon {
+    width: 18px; height: 18px; display: block;
+    fill: none; stroke: currentColor; stroke-width: 1.8;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  svg.icon.sm { width: 15px; height: 15px; }
+  svg.icon.lg { width: 22px; height: 22px; }
+  button { font-family: inherit; }
+
+  /* ============ 01 主界面 ============ */
+  .main-frame {
+    background-image: url("assets/main.jpg");
+    background-size: cover; background-position: center;
+    color: #fff;
+  }
+  .hero-shade {
+    position: absolute; inset: 0; z-index: 0;
+    background:
+      linear-gradient(180deg, rgba(4,10,18,.58) 0%, rgba(4,10,18,.06) 30%, rgba(4,10,18,.06) 58%, rgba(4,10,18,.62) 100%),
+      linear-gradient(90deg, rgba(4,10,18,.34) 0%, transparent 42%);
+  }
+  .hero-top {
+    position: absolute; z-index: 3; top: 22px; left: 26px; right: 26px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 11px;
+    height: 48px; padding: 0 16px 0 10px; border-radius: 16px;
+  }
+  .brand-mark {
+    width: 32px; height: 32px; border-radius: 10px;
+    display: grid; place-items: center;
+    background: linear-gradient(145deg, #36a9ff, #0067d6);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 6px 16px rgba(0, 103, 214, .35);
+    font-size: 22px; font-weight: 700; font-style: italic; color: #fff; line-height: 1;
+    font-family: "Segoe UI", sans-serif;
+  }
+  .brand-text { display: flex; flex-direction: column; gap: 1px; color: var(--ink); }
+  .brand-text strong { font-size: 14px; font-weight: 650; letter-spacing: .01em; }
+  .brand-text span { font-size: 10px; color: #667085; letter-spacing: .08em; text-transform: uppercase; }
+  .nav {
+    display: flex; align-items: center; gap: 4px;
+    height: 48px; padding: 5px; border-radius: 16px;
+  }
+  .nav-item {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 38px; padding: 0 14px; border-radius: 11px;
+    color: #344054; font-size: 13.5px; font-weight: 550; text-decoration: none;
+    transition: background .18s ease, color .18s ease;
+  }
+  .nav-item svg { color: #667085; }
+  .nav-item:hover { background: rgba(16,24,40,.06); color: #101828; }
+  .nav-item.active {
+    background: #101828; color: #fff; box-shadow: 0 6px 16px rgba(16,24,40,.22);
+  }
+  .nav-item.active svg { color: #fff; }
+  .top-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .icon-btn {
+    width: 48px; height: 48px; border: 0; border-radius: 16px; cursor: pointer;
+    display: grid; place-items: center; color: #344054;
+    background: var(--glass);
+    border: 1px solid rgba(255,255,255,.55);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+    box-shadow: 0 8px 30px rgba(16,24,40,.12);
+    transition: transform .18s ease, background .18s ease;
+  }
+  .icon-btn:hover { transform: translateY(-1px); background: rgba(255,255,255,.94); }
+  .icon-btn.dark { background: rgba(12,18,28,.34); border-color: rgba(255,255,255,.18); color: #fff; }
+  .win-controls {
+    display: flex; align-items: center; gap: 2px;
+    height: 48px; padding: 5px; border-radius: 16px;
+  }
+  .win-controls button {
+    width: 38px; height: 38px; border: 0; border-radius: 11px; background: transparent;
+    color: #344054; cursor: pointer; display: grid; place-items: center;
+    transition: background .18s ease;
+  }
+  .win-controls button:hover { background: rgba(16,24,40,.08); }
+  .win-controls button.close:hover { background: #ff4d4f; color: #fff; }
+
+  .hero-center {
+    position: absolute; z-index: 2; left: 64px; top: 300px; max-width: 760px;
+    text-shadow: 0 2px 30px rgba(0,0,0,.35);
+  }
+  .date-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 34px; padding: 0 13px; border-radius: 999px;
+    background: rgba(12,18,28,.32); border: 1px solid rgba(255,255,255,.22);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    font-size: 12.5px; font-weight: 550; color: rgba(255,255,255,.9);
+    letter-spacing: .02em;
+  }
+  .date-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: #52c41a; box-shadow: 0 0 0 4px rgba(82,196,26,.16); }
+  .hero-center h1 {
+    margin: 20px 0 12px; font-size: 62px; line-height: 1.08; letter-spacing: -.035em;
+    font-weight: 650; color: #fff;
+  }
+  .hero-center p {
+    margin: 0; font-size: 16px; color: rgba(255,255,255,.78); line-height: 1.7;
+    letter-spacing: .01em;
+  }
+  .hero-center .meta { margin-top: 18px; display: flex; align-items: center; gap: 14px; font-size: 12.5px; color: rgba(255,255,255,.62); }
+  .hero-center .meta span { display: inline-flex; align-items: center; gap: 6px; }
+  .hero-center .meta i { width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,.35); }
+
+  .hero-bottom {
+    position: absolute; z-index: 3; left: 26px; right: 26px; bottom: 24px;
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 18px;
+  }
+  .copyright-card {
+    max-width: 520px; padding: 14px 18px; border-radius: 16px;
+    color: rgba(255,255,255,.86);
+  }
+  .copyright-card .eyebrow {
+    font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: rgba(255,255,255,.48);
+  }
+  .copyright-card p { margin: 6px 0 0; font-size: 12.5px; line-height: 1.6; }
+  .copyright-card .auto { margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: rgba(255,255,255,.62); }
+  .control-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px; border-radius: 20px;
+    background: rgba(255,255,255,.86);
+    border: 1px solid rgba(255,255,255,.7);
+    box-shadow: 0 20px 60px rgba(0,0,0,.24);
+    backdrop-filter: blur(26px) saturate(150%);
+    -webkit-backdrop-filter: blur(26px) saturate(150%);
+  }
+  .control-item { display: flex; flex-direction: column; gap: 4px; }
+  .control-item > span { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: #98a2b3; padding-left: 3px; }
+  .select {
+    height: 42px; min-width: 156px; padding: 0 13px; border-radius: 12px; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    background: #f2f4f7; border: 1px solid rgba(16,24,40,.06);
+    color: #101828; font-size: 13px; font-weight: 550;
+  }
+  .select svg { color: #667085; }
+  .btn {
+    height: 42px; padding: 0 20px; border-radius: 12px; border: 1px solid transparent;
+    font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+    transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.ghost { background: #fff; border-color: rgba(16,24,40,.1); color: #344054; }
+  .btn.ghost:hover { background: #f9fafb; }
+  .btn.primary {
+    background: linear-gradient(180deg, #2b88ff, #1677ff); color: #fff;
+    box-shadow: 0 8px 18px rgba(22,119,255,.34), inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  .btn.primary:hover { background: linear-gradient(180deg, #1f7bff, #0958d9); }
+  .btn.soft { background: rgba(22,119,255,.1); color: var(--blue-deep); }
+  .btn.danger { background: #fff1f0; color: #cf1322; }
+
+  /* ============ 通用 App Shell（图库/设置） ============ */
+  .shell-frame { background: #eef2f7; }
+  .shell-bg {
+    position: absolute; inset: -40px; z-index: 0;
+    background-image: url("assets/shell.jpg"); background-size: cover; background-position: center;
+    filter: blur(34px) saturate(120%); transform: scale(1.08); opacity: .45;
+  }
+  .shell-bg::after { content: ""; position: absolute; inset: 0; background: rgba(244,247,251,.82); }
+  .app-shell {
+    position: absolute; inset: 0; z-index: 1; display: grid;
+    grid-template-columns: 236px 1fr;
+  }
+  .sidebar {
+    margin: 18px 0 18px 18px; border-radius: 20px; padding: 18px 14px;
+    background: rgba(255,255,255,.76); border: 1px solid rgba(255,255,255,.72);
+    box-shadow: 0 18px 50px rgba(16,24,40,.10);
+    backdrop-filter: blur(26px) saturate(150%);
+    -webkit-backdrop-filter: blur(26px) saturate(150%);
+    display: flex; flex-direction: column;
+  }
+  .side-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 20px; }
+  .side-brand .brand-mark { width: 34px; height: 34px; border-radius: 11px; }
+  .side-brand strong { display: block; font-size: 13.5px; font-weight: 650; }
+  .side-brand span { display: block; margin-top: 2px; font-size: 10px; letter-spacing: .1em; color: #98a2b3; text-transform: uppercase; }
+  .side-group-label { padding: 14px 10px 7px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: #98a2b3; }
+  .side-nav { display: flex; flex-direction: column; gap: 3px; }
+  .side-item {
+    display: flex; align-items: center; gap: 11px; height: 42px; padding: 0 12px;
+    border-radius: 11px; text-decoration: none; color: #475467; font-size: 13.5px; font-weight: 550;
+    transition: background .18s ease, color .18s ease;
+  }
+  .side-item svg { color: #98a2b3; }
+  .side-item:hover { background: rgba(16,24,40,.05); color: #101828; }
+  .side-item.active { background: #101828; color: #fff; box-shadow: 0 8px 20px rgba(16,24,40,.18); }
+  .side-item.active svg { color: #fff; }
+  .side-item .badge {
+    margin-left: auto; height: 20px; min-width: 20px; padding: 0 6px; border-radius: 999px;
+    display: grid; place-items: center; font-size: 10.5px; font-weight: 650;
+    background: rgba(22,119,255,.12); color: var(--blue-deep);
+  }
+  .side-item.active .badge { background: rgba(255,255,255,.18); color: #fff; }
+  .side-spacer { flex: 1; }
+  .storage-card {
+    margin: 14px 4px 4px; padding: 14px; border-radius: 14px;
+    background: linear-gradient(160deg, rgba(22,119,255,.08), rgba(0,196,204,.05));
+    border: 1px solid rgba(22,119,255,.12);
+  }
+  .storage-card .row { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: #475467; }
+  .storage-card .row b { color: #101828; font-size: 12px; }
+  .storage-card .bar { margin-top: 10px; height: 6px; border-radius: 99px; background: rgba(16,24,40,.08); overflow: hidden; }
+  .storage-card .bar i { display: block; width: 42%; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #36a9ff, #1677ff); }
+  .storage-card .hint { margin-top: 8px; font-size: 10.5px; color: #98a2b3; }
+  .side-foot { padding: 14px 10px 4px; display: flex; align-items: center; justify-content: space-between; color: #98a2b3; font-size: 10.5px; }
+
+  .content {
+    margin: 18px 18px 18px 14px; border-radius: 20px;
+    background: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.72);
+    box-shadow: 0 18px 50px rgba(16,24,40,.08);
+    backdrop-filter: blur(26px) saturate(140%);
+    -webkit-backdrop-filter: blur(26px) saturate(140%);
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .content-top {
+    height: 74px; padding: 0 30px; display: flex; align-items: center; gap: 16px;
+    border-bottom: 1px solid rgba(16,24,40,.06);
+  }
+  .crumb { display: flex; align-items: center; gap: 8px; color: #98a2b3; font-size: 12px; }
+  .crumb b { color: #101828; font-weight: 600; }
+  .content-top .search {
+    margin-left: auto; width: 260px; height: 38px; border-radius: 11px;
+    background: rgba(16,24,40,.045); border: 1px solid rgba(16,24,40,.06);
+    display: flex; align-items: center; gap: 9px; padding: 0 12px; color: #98a2b3; font-size: 12.5px;
+  }
+  .content-top .search kbd {
+    margin-left: auto; font-family: inherit; font-size: 10px; color: #98a2b3;
+    background: #fff; border: 1px solid rgba(16,24,40,.08); border-radius: 5px; padding: 2px 5px;
+  }
+  .avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(145deg, #36a9ff, #0958d9);
+    display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 700;
+    box-shadow: 0 6px 14px rgba(22,119,255,.25);
+  }
+  .page-body { padding: 26px 30px 30px; overflow: hidden; flex: 1; }
+  .page-title-row { display: flex; align-items: flex-start; gap: 16px; }
+  .page-title-row h2 { margin: 0; font-size: 28px; letter-spacing: -.03em; font-weight: 650; }
+  .page-title-row p { margin: 7px 0 0; color: #667085; font-size: 13px; }
+  .page-title-row .actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+  /* ============ 02 图库 ============ */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 22px; }
+  .stat-card {
+    padding: 15px 16px; border-radius: 14px; background: #fff;
+    border: 1px solid rgba(16,24,40,.06); box-shadow: 0 4px 14px rgba(16,24,40,.04);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .stat-icon {
+    width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center;
+    background: rgba(22,119,255,.09); color: var(--blue);
+  }
+  .stat-card:nth-child(2) .stat-icon { background: rgba(250,84,28,.09); color: #fa541c; }
+  .stat-card:nth-child(3) .stat-icon { background: rgba(82,196,26,.1); color: #389e0d; }
+  .stat-card:nth-child(4) .stat-icon { background: rgba(114,46,209,.09); color: #722ed1; }
+  .stat-card .num { font-size: 20px; font-weight: 680; letter-spacing: -.02em; }
+  .stat-card .lbl { margin-top: 2px; font-size: 11px; color: #98a2b3; }
+  .filter-row { margin-top: 18px; display: flex; align-items: center; gap: 10px; }
+  .segmented {
+    display: inline-flex; padding: 4px; gap: 2px; border-radius: 11px;
+    background: rgba(16,24,40,.05); border: 1px solid rgba(16,24,40,.04);
+  }
+  .segmented button {
+    height: 32px; padding: 0 13px; border: 0; border-radius: 8px; background: transparent;
+    color: #667085; font-size: 12.5px; font-weight: 550; cursor: pointer;
+  }
+  .segmented button.active { background: #fff; color: #101828; box-shadow: 0 2px 8px rgba(16,24,40,.10); }
+  .filter-select {
+    height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(16,24,40,.08);
+    background: #fff; color: #344054; font-size: 12.5px; font-weight: 550;
+    display: inline-flex; align-items: center; gap: 9px; cursor: pointer;
+  }
+  .filter-row .right { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+  .icon-sq {
+    width: 40px; height: 40px; border-radius: 10px; border: 1px solid rgba(16,24,40,.08);
+    background: #fff; color: #667085; display: grid; place-items: center; cursor: pointer;
+  }
+  .icon-sq.active { background: #101828; color: #fff; border-color: #101828; }
+  .gallery-grid {
+    margin-top: 18px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+  }
+  .wall-card {
+    position: relative; height: 186px; border-radius: 14px; overflow: hidden;
+    background: #dfe5ee; box-shadow: 0 6px 18px rgba(16,24,40,.10);
+    cursor: pointer; isolation: isolate;
+  }
+  .wall-card img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .5s ease; }
+  .wall-card:hover img { transform: scale(1.045); }
+  .wall-card .veil {
+    position: absolute; inset: 0; background: linear-gradient(180deg, rgba(4,10,18,.02) 40%, rgba(4,10,18,.72) 100%);
+  }
+  .wall-card .date-badge {
+    position: absolute; left: 10px; top: 10px; height: 24px; padding: 0 8px; border-radius: 7px;
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(12,18,28,.42); border: 1px solid rgba(255,255,255,.18);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: #fff; font-size: 10.5px; font-weight: 600; letter-spacing: .03em;
+  }
+  .wall-card .heart {
+    position: absolute; right: 10px; top: 10px; width: 28px; height: 28px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.2); background: rgba(12,18,28,.38);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: #fff; display: grid; place-items: center; cursor: pointer;
+  }
+  .wall-card .heart.on { background: rgba(255,77,79,.9); border-color: transparent; }
+  .wall-card .cap { position: absolute; left: 12px; right: 12px; bottom: 11px; color: #fff; }
+  .wall-card .cap strong { display: block; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wall-card .cap span { display: block; margin-top: 3px; font-size: 10px; color: rgba(255,255,255,.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wall-card .quick {
+    position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px; opacity: 0; transform: translateY(4px);
+    transition: opacity .2s ease, transform .2s ease;
+  }
+  .wall-card:hover .quick { opacity: 1; transform: translateY(0); }
+  .quick button {
+    width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(255,255,255,.22);
+    background: rgba(12,18,28,.46); color: #fff; display: grid; place-items: center; cursor: pointer;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  .quick button:hover { background: #fff; color: #101828; }
+  .pagination { margin-top: 18px; display: flex; align-items: center; justify-content: space-between; color: #98a2b3; font-size: 11.5px; }
+  .pager { display: flex; align-items: center; gap: 5px; }
+  .pager button {
+    min-width: 30px; height: 30px; padding: 0 8px; border-radius: 8px; border: 1px solid rgba(16,24,40,.08);
+    background: #fff; color: #475467; font-size: 11.5px; cursor: pointer;
+  }
+  .pager button.active { background: #101828; border-color: #101828; color: #fff; }
+
+  /* ============ 03 设置 ============ */
+  .settings-body { padding: 20px 26px 22px; overflow: hidden; }
+  .settings-grid { display: grid; grid-template-columns: 1fr 322px; gap: 12px; margin-top: 14px; }
+  .settings-col { display: flex; flex-direction: column; gap: 12px; }
+  .panel {
+    border-radius: 15px; background: #fff; border: 1px solid rgba(16,24,40,.06);
+    box-shadow: 0 4px 14px rgba(16,24,40,.04); overflow: hidden;
+  }
+  .panel-head { padding: 12px 16px 0; }
+  .panel-head h3 { margin: 0; font-size: 13.5px; font-weight: 650; }
+  .panel-head p { margin: 3px 0 0; font-size: 11px; color: #98a2b3; }
+  .panel-body { padding: 2px 16px 6px; }
+  .setting-row {
+    min-height: 40px; display: flex; align-items: center; gap: 14px;
+    border-bottom: 1px solid rgba(16,24,40,.055);
+  }
+  .setting-row:last-child { border-bottom: 0; }
+  .setting-row .label { flex: 1; min-width: 0; }
+  .setting-row .label b { display: block; font-size: 12.5px; font-weight: 550; color: #344054; }
+  .setting-row .label span { display: block; margin-top: 3px; font-size: 10.5px; color: #98a2b3; }
+  .switch {
+    width: 38px; height: 22px; border-radius: 99px; background: rgba(16,24,40,.16); position: relative; flex: none;
+    cursor: pointer; transition: background .2s ease;
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 4px rgba(16,24,40,.25); transition: left .2s ease;
+  }
+  .switch.on { background: var(--blue); }
+  .switch.on::after { left: 18px; }
+  .mini-select {
+    height: 34px; min-width: 118px; padding: 0 10px; border-radius: 9px; cursor: pointer;
+    border: 1px solid rgba(16,24,40,.09); background: #f8fafc; color: #344054;
+    font-size: 11.5px; font-weight: 550; display: inline-flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .time-picker {
+    display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 8px;
+    border-radius: 9px; border: 1px solid rgba(16,24,40,.09); background: #f8fafc;
+    color: #344054; font-size: 12px; font-weight: 600;
+  }
+  .time-picker span { color: #98a2b3; font-weight: 500; }
+  .path-box {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    height: 36px; padding: 0 11px; border-radius: 9px;
+    background: #f8fafc; border: 1px solid rgba(16,24,40,.09);
+    color: #475467; font-size: 11px; font-family: "Cascadia Code", "Consolas", monospace;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .path-box svg { flex: none; color: #98a2b3; }
+  .preview-card { border-radius: 15px; overflow: hidden; position: relative; background: #101828; min-height: 218px; }
+  .preview-card img { width: 100%; height: 218px; object-fit: cover; display: block; opacity: .92; }
+  .preview-card .veil { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 25%, rgba(4,10,18,.78) 100%); }
+  .preview-card .copy { position: absolute; left: 16px; right: 16px; bottom: 14px; color: #fff; }
+  .preview-card .copy small { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.55); }
+  .preview-card .copy strong { display: block; margin-top: 5px; font-size: 15px; font-weight: 600; }
+  .preview-card .copy p { margin: 4px 0 10px; font-size: 10.5px; color: rgba(255,255,255,.6); }
+  .preview-card .copy .btn { height: 34px; padding: 0 13px; font-size: 11.5px; border-radius: 9px; }
+  .info-card { padding: 15px 16px; }
+  .info-card .line { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 11.5px; color: #667085; }
+  .info-card .line b { color: #344054; font-weight: 600; }
+  .info-card .divider { height: 1px; background: rgba(16,24,40,.06); margin: 6px 0; }
+  .update-pill {
+    display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px;
+    border-radius: 999px; background: rgba(82,196,26,.1); color: #389e0d; font-size: 10.5px; font-weight: 600;
+  }
+  .update-pill .dot { width: 5px; height: 5px; border-radius: 50%; background: #52c41a; }
+
+  /* ============ 04 批量下载 ============ */
+  .download-frame { background: #101828; }
+  .download-bg {
+    position: absolute; inset: -30px;
+    background-image: url("assets/main.jpg"); background-size: cover; background-position: center;
+    filter: blur(26px) saturate(120%); transform: scale(1.06); opacity: .72;
+  }
+  .download-bg::after { content: ""; position: absolute; inset: 0; background: rgba(8,14,24,.55); }
+  .modal {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 780px; border-radius: 20px; overflow: hidden;
+    background: #fff; box-shadow: 0 40px 120px rgba(0,0,0,.55);
+  }
+  .modal-head { padding: 22px 26px 18px; display: flex; align-items: flex-start; gap: 14px; border-bottom: 1px solid rgba(16,24,40,.06); }
+  .modal-head .icon-box {
+    width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center;
+    background: rgba(22,119,255,.1); color: var(--blue);
+  }
+  .modal-head h3 { margin: 1px 0 0; font-size: 19px; font-weight: 650; letter-spacing: -.02em; }
+  .modal-head p { margin: 5px 0 0; font-size: 11.5px; color: #98a2b3; }
+  .modal-head .close { margin-left: auto; width: 34px; height: 34px; border-radius: 10px; border: 0; background: transparent; color: #667085; cursor: pointer; display: grid; place-items: center; }
+  .modal-head .close:hover { background: #f2f4f7; }
+  .modal-body { padding: 20px 26px 22px; }
+  .alert {
+    display: flex; align-items: flex-start; gap: 9px; padding: 11px 13px; border-radius: 10px;
+    background: rgba(22,119,255,.06); border: 1px solid rgba(22,119,255,.12);
+    color: #475467; font-size: 11.5px; line-height: 1.6;
+  }
+  .alert svg { flex: none; margin-top: 1px; color: var(--blue); }
+  .range-row { display: flex; align-items: flex-end; gap: 10px; margin-top: 18px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #98a2b3; }
+  .date-input {
+    height: 40px; width: 178px; padding: 0 12px; border-radius: 10px;
+    border: 1px solid rgba(16,24,40,.1); background: #fff; color: #344054;
+    font-size: 12.5px; font-weight: 550; display: flex; align-items: center; gap: 9px;
+  }
+  .date-input svg { color: #98a2b3; }
+  .range-sep { height: 40px; display: grid; place-items: center; color: #98a2b3; font-size: 12px; padding: 0 2px; }
+  .range-row .btn { height: 40px; margin-left: auto; }
+  .progress-card {
+    margin-top: 18px; padding: 14px 16px; border-radius: 12px;
+    background: #f8fafc; border: 1px solid rgba(16,24,40,.06);
+  }
+  .progress-top { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: #667085; }
+  .progress-top b { color: #101828; font-size: 12px; }
+  .progress-top .count { color: #98a2b3; }
+  .progress-bar { margin-top: 10px; height: 8px; border-radius: 99px; background: rgba(16,24,40,.08); overflow: hidden; }
+  .progress-bar i { display: block; width: 86%; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #36a9ff, #1677ff); box-shadow: 0 0 10px rgba(22,119,255,.35); }
+  .log-box {
+    margin-top: 14px; height: 214px; border-radius: 12px; overflow: hidden;
+    background: #0f172a; border: 1px solid rgba(255,255,255,.06);
+    font-family: "Cascadia Code", "Consolas", "SFMono-Regular", monospace;
+  }
+  .log-head { height: 34px; padding: 0 13px; display: flex; align-items: center; gap: 7px; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .log-head i { width: 7px; height: 7px; border-radius: 50%; background: #ff5f57; }
+  .log-head i:nth-child(2) { background: #febc2e; }
+  .log-head i:nth-child(3) { background: #28c840; }
+  .log-head span { margin-left: 6px; font-family: var(--font); font-size: 10px; letter-spacing: .08em; color: rgba(255,255,255,.35); text-transform: uppercase; }
+  .log-body { padding: 10px 13px; font-size: 11px; line-height: 1.85; color: #94a3b8; overflow: hidden; }
+  .log-body .ok { color: #4ade80; }
+  .log-body .warn { color: #fbbf24; }
+  .log-body .info { color: #60a5fa; }
+  .log-body .time { color: #475569; }
+  .modal-foot { padding: 14px 26px 18px; display: flex; align-items: center; gap: 10px; border-top: 1px solid rgba(16,24,40,.06); }
+  .modal-foot .hint { font-size: 10.5px; color: #98a2b3; }
+  .modal-foot .right { margin-left: auto; display: flex; gap: 9px; }
+
+  @media (max-width: 1500px) {
+    .canvas { padding-left: 24px; padding-right: 24px; }
+    .page-head { padding-left: 24px; padding-right: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.7 12 3l9 7.7V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></symbol>
+    <symbol id="i-min" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-max" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12"/><path d="m18 6-12 12"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1L12 21l7.7-7.6 1.1-1a5.5 5.5 0 0 0 0-7.8z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m20 6-11 11-5-5"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m5 3 14 9-14 9z"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v3"/><path d="M12 18v3"/><path d="M3 12h3"/><path d="M18 12h3"/><path d="m5.6 5.6 2.1 2.1"/><path d="m16.3 16.3 2.1 2.1"/><path d="m18.4 5.6-2.1 2.1"/><path d="m7.7 16.3-2.1 2.1"/></symbol>
+  </defs>
+</svg>
+
+<header class="page-head">
+  <div class="eyebrow">BingWallpaper 2 · Rebuild Concept</div>
+  <h1>跨平台复刻 · 界面示意图</h1>
+  <p>Rust + Tauri 2.12 + Vue 3 + Ant Design Vue + Pinia。保留原版“整幅 Bing 每日图 + 悬浮玻璃工具栏”的沉浸感，并扩展图库、批量下载、自动化设置与跨平台能力。</p>
+</header>
+
+<main class="canvas">
+
+  <!-- ================= 01 主界面 ================= -->
+  <section class="shot">
+    <div class="shot-label"><b>01 · 主界面</b><span>沉浸式今日壁纸 · 顶部导航 + 底部玻璃控制条</span></div>
+    <div class="frame main-frame" role="region" aria-label="01 主界面">
+      <div class="hero-shade"></div>
+
+      <header class="hero-top">
+        <div class="brand glass">
+          <div class="brand-mark">b</div>
+          <div class="brand-text">
+            <strong>必应每日壁纸</strong>
+            <span>BingWallpaper 2</span>
+          </div>
+        </div>
+
+        <nav class="nav glass">
+          <a class="nav-item active" href="#"><svg class="icon sm"><use href="#i-home"/></svg>今日</a>
+          <a class="nav-item" href="#"><svg class="icon sm"><use href="#i-image"/></svg>图库</a>
+          <a class="nav-item" href="#"><svg class="icon sm"><use href="#i-download"/></svg>下载</a>
+          <a class="nav-item" href="#"><svg class="icon sm"><use href="#i-settings"/></svg>设置</a>
+        </nav>
+
+        <div class="top-actions">
+          <button class="icon-btn" title="打开图片文件夹"><svg class="icon"><use href="#i-folder"/></svg></button>
+          <button class="icon-btn" title="通知"><svg class="icon"><use href="#i-bell"/></svg></button>
+          <div class="win-controls glass">
+            <button title="最小化"><svg class="icon sm"><use href="#i-min"/></svg></button>
+            <button title="最大化"><svg class="icon sm"><use href="#i-max"/></svg></button>
+            <button class="close" title="关闭"><svg class="icon sm"><use href="#i-close"/></svg></button>
+          </div>
+        </div>
+      </header>
+
+      <div class="hero-center">
+        <div class="date-chip"><span class="dot"></span>2026年11月02日 · 星期一 · 今日壁纸</div>
+        <h1>信天翁的<br/>求偶之舞</h1>
+        <p>南乔治亚岛 · 黑眉信天翁</p>
+        <div class="meta">
+          <span><svg class="icon sm"><use href="#i-image"/></svg>1920 × 1080</span>
+          <i></i>
+          <span><svg class="icon sm"><use href="#i-heart"/></svg>已收藏</span>
+          <i></i>
+          <span>Bing 每日图片</span>
+        </div>
+      </div>
+
+      <div class="hero-bottom">
+        <div class="copyright-card glass-dark">
+          <div class="eyebrow">Today's story</div>
+          <p>黑眉信天翁在南乔治亚岛的草丛中展开求偶舞，背景是壮阔的雪山与海湾。</p>
+          <div class="auto"><svg class="icon sm"><use href="#i-clock"/></svg>自动设置：每天 00:05 · 已开启</div>
+        </div>
+
+        <div class="control-bar">
+          <div class="control-item">
+            <span>图片尺寸</span>
+            <button class="select">1920 × 1080 <svg class="icon sm"><use href="#i-chevron"/></svg></button>
+          </div>
+          <div class="control-item">
+            <span>契合度</span>
+            <button class="select" style="min-width:126px">填充 <svg class="icon sm"><use href="#i-chevron"/></svg></button>
+          </div>
+          <button class="btn ghost"><svg class="icon sm"><use href="#i-refresh"/></svg>刷新</button>
+          <button class="btn primary"><svg class="icon sm"><use href="#i-check"/></svg>设为壁纸</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 02 图库 ================= -->
+  <section class="shot">
+    <div class="shot-label"><b>02 · 图库</b><span>历史壁纸网格 · 收藏 / 搜索 / 批量下载</span></div>
+    <div class="frame shell-frame" role="region" aria-label="02 图库">
+      <div class="shell-bg"></div>
+      <div class="app-shell">
+        <aside class="sidebar">
+          <div class="side-brand">
+            <div class="brand-mark">b</div>
+            <div><strong>必应每日壁纸</strong><span>BingWallpaper 2</span></div>
+          </div>
+
+          <div class="side-group-label">浏览</div>
+          <nav class="side-nav">
+            <a class="side-item" href="#"><svg class="icon"><use href="#i-home"/></svg>今日壁纸</a>
+            <a class="side-item active" href="#"><svg class="icon"><use href="#i-image"/></svg>图库<span class="badge">24</span></a>
+            <a class="side-item" href="#"><svg class="icon"><use href="#i-download"/></svg>批量下载</a>
+            <a class="side-item" href="#"><svg class="icon"><use href="#i-heart"/></svg>我的收藏<span class="badge">8</span></a>
+          </nav>
+
+          <div class="side-group-label">应用</div>
+          <nav class="side-nav">
+            <a class="side-item" href="#"><svg class="icon"><use href="#i-settings"/></svg>设置</a>
+            <a class="side-item" href="#"><svg class="icon"><use href="#i-info"/></svg>关于</a>
+          </nav>
+
+          <div class="side-spacer"></div>
+          <div class="storage-card">
+            <div class="row"><span>本地存储</span><b>126 MB / 2 GB</b></div>
+            <div class="bar"><i></i></div>
+            <div class="hint">共 24 张图片 · 最早 2026-10-10</div>
+          </div>
+          <div class="side-foot"><span>v2.1.0 · Stable</span><span>检查更新</span></div>
+        </aside>
+
+        <main class="content">
+          <div class="content-top">
+            <div class="crumb">应用 <span>/</span> <b>图库</b></div>
+            <div class="search"><svg class="icon sm"><use href="#i-search"/></svg>搜索标题、日期或版权信息<kbd>⌘ K</kbd></div>
+            <div class="avatar">L</div>
+          </div>
+
+          <div class="page-body">
+            <div class="page-title-row">
+              <div>
+                <h2>图库</h2>
+                <p>浏览已下载的 Bing 每日壁纸，支持收藏、设为壁纸和批量导出。</p>
+              </div>
+              <div class="actions">
+                <button class="btn ghost"><svg class="icon sm"><use href="#i-folder"/></svg>打开目录</button>
+                <button class="btn primary"><svg class="icon sm"><use href="#i-download"/></svg>批量下载</button>
+              </div>
+            </div>
+
+            <div class="stats-row">
+              <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-image"/></svg></div><div><div class="num">24</div><div class="lbl">本地图片</div></div></div>
+              <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-heart"/></svg></div><div><div class="num">8</div><div class="lbl">已收藏</div></div></div>
+              <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-download"/></svg></div><div><div class="num">126 MB</div><div class="lbl">占用空间</div></div></div>
+              <div class="stat-card"><div class="stat-icon"><svg class="icon"><use href="#i-clock"/></svg></div><div><div class="num">今天 00:05</div><div class="lbl">最近更新</div></div></div>
+            </div>
+
+            <div class="filter-row">
+              <div class="segmented">
+                <button class="active">全部</button>
+                <button>最近 7 天</button>
+                <button>已收藏</button>
+              </div>
+              <button class="filter-select"><svg class="icon sm"><use href="#i-calendar"/></svg>2026 年 11 月<svg class="icon sm"><use href="#i-chevron"/></svg></button>
+              <div class="right">
+                <button class="icon-sq active"><svg class="icon sm"><use href="#i-grid"/></svg></button>
+                <button class="icon-sq"><svg class="icon sm"><use href="#i-list"/></svg></button>
+              </div>
+            </div>
+
+            <div class="gallery-grid">
+              <article class="wall-card">
+                <img src="assets/g1.jpg" alt="" />
+                <div class="veil"></div>
+                <div class="date-badge"><svg class="icon sm" style="width:11px;height:11px"><use href="#i-calendar"/></svg>11-02</div>
+                <button class="heart on"><svg class="icon sm"><use href="#i-heart"/></svg></button>
+                <div class="cap"><strong>落日岩峰</strong><span>美国 · 布莱斯峡谷</span></div>
+                <div class="quick"><button title="设为壁纸"><svg class="icon sm"><use href="#i-check"/></svg></button><button title="下载"><svg class="icon sm"><use href="#i-download"/></svg></button></div>
+              </article>
+              <article class="wall-card">
+                <img src="assets/g2.jpg" alt="" />
+                <div class="veil"></div>
+                <div class="date-badge"><svg class="icon sm" style="width:11px;height:11px"><use href="#i-calendar"/></svg>11-01</div>
+                <button class="heart"><svg class="icon sm"><use href="#i-heart"/></svg></button>
+                <div class="cap"><strong>冰封瀑布</strong><span>美国 · 俄勒冈</span></div>
+                <div class="quick"><button title="设为壁纸"><svg class="icon sm"><use href="#i-check"/></svg></button><button title="下载"><svg class="icon sm"><use href="#i-download"/></svg></button></div>
+              </article>
+              <article class="wall-card">
+                <img src="assets/g3.jpg" alt="" />
+                <div class="veil"></div>
+                <div class="date-badge"><svg class="icon sm" style="width:11px;height:11px"><use href="#i-calendar"/></svg>10-31</div>
+                <button class="heart on"><svg class="icon sm"><use href="#i-heart"/></svg></button>
+                <div class="cap"><strong>长桥落日</strong><span>澳大利亚 · 珀斯</span></div>
+                <div class="quick"><button title="设为壁纸"><svg class="icon sm"><use href="#i-check"/></svg></button><button title="下载"><svg class="icon sm"><use href="#i-download"/></svg></button></div>
+              </article>
+              <article class="wall-card">
+                <img src="assets/g4.jpg" alt="" />
+                <div class="veil"></div>
+                <div class="date-badge"><svg class="icon sm" style="width:11px;height:11px"><use href="#i-calendar"/></svg>10-30</div>
+                <button class="heart"><svg class="icon sm"><use href="#i-heart"/></svg></button>
+                <div class="cap"><strong>蝶舞花间</strong><span>欧洲 · 高山草甸</span></div>
+                <div class="quick"><button title="设为壁纸"><svg class="icon sm"><use href="#i-check"/></svg></button><button title="下载"><svg class="icon sm"><use href="#i-download"/></svg></button></div>
+              </article>
+              <article class="wall-card">
+                <img src="assets/g5.jpg" alt="" />
+                <div class="veil"></div>
+                <div class="date-badge"><svg class="icon sm" style="width:11px;height:11px"><use href="#i-calendar"/></svg>10-29</div>
+                <button class="heart"><svg class="icon sm"><use href="#i-heart"/></svg></button>
+                <div class="cap"><strong>雪山晨曦</strong><span>尼泊尔 · 喜马拉雅</span></div>
+                <div class="quick"><button title="设为壁纸"><svg class="icon sm"><use href="#i-check"/></svg></button><button title="下载"><svg class="icon sm"><use href="#i-download"/></svg></button></div>
+              </article>
+              <article class="wall-card">
+                <img src="assets/g6.jpg" alt="" />
+                <div class="veil"></div>
+                <div class="date-badge"><svg class="icon sm" style="width:11px;height:11px"><use href="#i-calendar"/></svg>10-28</div>
+                <button class="heart on"><svg class="icon sm"><use href="#i-heart"/></svg></button>
+                <div class="cap"><strong>灯火古寺</strong><span>日本 · 京都</span></div>
+                <div class="quick"><button title="设为壁纸"><svg class="icon sm"><use href="#i-check"/></svg></button><button title="下载"><svg class="icon sm"><use href="#i-download"/></svg></button></div>
+              </article>
+              <article class="wall-card">
+                <img src="assets/g7.jpg" alt="" />
+                <div class="veil"></div>
+                <div class="date-badge"><svg class="icon sm" style="width:11px;height:11px"><use href="#i-calendar"/></svg>10-27</div>
+                <button class="heart"><svg class="icon sm"><use href="#i-heart"/></svg></button>
+                <div class="cap"><strong>雪国小镇</strong><span>奥地利 · 哈尔施塔特</span></div>
+                <div class="quick"><button title="设为壁纸"><svg class="icon sm"><use href="#i-check"/></svg></button><button title="下载"><svg class="icon sm"><use href="#i-download"/></svg></button></div>
+              </article>
+              <article class="wall-card">
+                <img src="assets/g8.jpg" alt="" />
+                <div class="veil"></div>
+                <div class="date-badge"><svg class="icon sm" style="width:11px;height:11px"><use href="#i-calendar"/></svg>10-26</div>
+                <button class="heart"><svg class="icon sm"><use href="#i-heart"/></svg></button>
+                <div class="cap"><strong>雪滴花</strong><span>欧洲 · 早春</span></div>
+                <div class="quick"><button title="设为壁纸"><svg class="icon sm"><use href="#i-check"/></svg></button><button title="下载"><svg class="icon sm"><use href="#i-download"/></svg></button></div>
+              </article>
+            </div>
+
+            <div class="pagination">
+              <span>显示 1–8 条，共 24 条</span>
+              <div class="pager">
+                <button>‹</button><button class="active">1</button><button>2</button><button>3</button><button>›</button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 03 设置 ================= -->
+  <section class="shot">
+    <div class="shot-label"><b>03 · 设置</b><span>壁纸 / 自动化 / 存储 / 更新 · 分组卡片式设置</span></div>
+    <div class="frame shell-frame" role="region" aria-label="03 设置">
+      <div class="shell-bg"></div>
+      <div class="app-shell">
+        <aside class="sidebar">
+          <div class="side-brand">
+            <div class="brand-mark">b</div>
+            <div><strong>必应每日壁纸</strong><span>BingWallpaper 2</span></div>
+          </div>
+
+          <div class="side-group-label">浏览</div>
+          <nav class="side-nav">
+            <a class="side-item" href="#"><svg class="icon"><use href="#i-home"/></svg>今日壁纸</a>
+            <a class="side-item" href="#"><svg class="icon"><use href="#i-image"/></svg>图库<span class="badge">24</span></a>
+            <a class="side-item" href="#"><svg class="icon"><use href="#i-download"/></svg>批量下载</a>
+            <a class="side-item" href="#"><svg class="icon"><use href="#i-heart"/></svg>我的收藏<span class="badge">8</span></a>
+          </nav>
+
+          <div class="side-group-label">应用</div>
+          <nav class="side-nav">
+            <a class="side-item active" href="#"><svg class="icon"><use href="#i-settings"/></svg>设置</a>
+            <a class="side-item" href="#"><svg class="icon"><use href="#i-info"/></svg>关于</a>
+          </nav>
+
+          <div class="side-spacer"></div>
+          <div class="storage-card">
+            <div class="row"><span>本地存储</span><b>126 MB / 2 GB</b></div>
+            <div class="bar"><i></i></div>
+            <div class="hint">共 24 张图片 · 最早 2026-10-10</div>
+          </div>
+          <div class="side-foot"><span>v2.1.0 · Stable</span><span>检查更新</span></div>
+        </aside>
+
+        <main class="content">
+          <div class="content-top">
+            <div class="crumb">应用 <span>/</span> <b>设置</b></div>
+            <div class="search"><svg class="icon sm"><use href="#i-search"/></svg>搜索设置项<kbd>⌘ K</kbd></div>
+            <div class="avatar">L</div>
+          </div>
+
+          <div class="settings-body">
+            <div class="page-title-row">
+              <div>
+                <h2>设置</h2>
+                <p>调整壁纸行为、自动化任务与存储策略。修改会立即生效。</p>
+              </div>
+              <div class="actions">
+                <span class="update-pill"><span class="dot"></span>已是最新版本</span>
+              </div>
+            </div>
+
+            <div class="settings-grid">
+              <div class="settings-col">
+                <div class="panel">
+                  <div class="panel-head"><h3>壁纸</h3><p>控制每日图片的下载尺寸与桌面契合方式。</p></div>
+                  <div class="panel-body">
+                    <div class="setting-row">
+                      <div class="label"><b>图片尺寸</b><span>更高分辨率会增加下载体积与处理时间</span></div>
+                      <button class="mini-select">1920 × 1080<svg class="icon sm"><use href="#i-chevron"/></svg></button>
+                    </div>
+                    <div class="setting-row">
+                      <div class="label"><b>契合度</b><span>不同平台支持的选项略有差异</span></div>
+                      <button class="mini-select">填充（Fill）<svg class="icon sm"><use href="#i-chevron"/></svg></button>
+                    </div>
+                    <div class="setting-row">
+                      <div class="label"><b>图片保存目录</b><span>原图与缩略图缓存位置</span></div>
+                      <div class="path-box" style="max-width:260px"><svg class="icon sm"><use href="#i-folder"/></svg>~/Pictures/BingWallpaper</div>
+                      <button class="btn ghost" style="height:34px;padding:0 12px;font-size:11.5px">选择</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="panel">
+                  <div class="panel-head"><h3>自动化</h3><p>开机启动与每日定时设置，后台常驻不打扰。</p></div>
+                  <div class="panel-body">
+                    <div class="setting-row">
+                      <div class="label"><b>开机自动启动</b><span>登录系统后在托盘静默启动</span></div>
+                      <div class="switch on"></div>
+                    </div>
+                    <div class="setting-row">
+                      <div class="label"><b>每天自动设置壁纸</b><span>到达指定时间后自动下载并应用今日图片</span></div>
+                      <div class="switch on"></div>
+                    </div>
+                    <div class="setting-row">
+                      <div class="label"><b>执行时间</b><span>建议设置在网络稳定且电脑已开机的时段</span></div>
+                      <div class="time-picker">00 <span>:</span> 05</div>
+                    </div>
+                    <div class="setting-row">
+                      <div class="label"><b>错过任务后补设</b><span>睡眠或关机导致错过时，唤醒后自动补执行</span></div>
+                      <div class="switch on"></div>
+                    </div>
+                    <div class="setting-row">
+                      <div class="label"><b>桌面通知</b><span>设置成功或失败时发送系统通知</span></div>
+                      <div class="switch on"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="panel">
+                  <div class="panel-head"><h3>常规与更新</h3><p>界面语言、主题和版本更新策略。</p></div>
+                  <div class="panel-body">
+                    <div class="setting-row">
+                      <div class="label"><b>界面语言</b><span>跟随系统或手动指定</span></div>
+                      <button class="mini-select">简体中文<svg class="icon sm"><use href="#i-chevron"/></svg></button>
+                    </div>
+                    <div class="setting-row">
+                      <div class="label"><b>主题</b><span>浅色 / 深色 / 跟随系统</span></div>
+                      <button class="mini-select">跟随系统<svg class="icon sm"><use href="#i-chevron"/></svg></button>
+                    </div>
+                    <div class="setting-row">
+                      <div class="label"><b>关闭按钮行为</b><span>关闭窗口时最小化到托盘，而非退出程序</span></div>
+                      <div class="switch on"></div>
+                    </div>
+                    <div class="setting-row">
+                      <div class="label"><b>自动检查更新</b><span>启动时检查 GitHub Releases 上的签名版本</span></div>
+                      <div class="switch on"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-col">
+                <div class="preview-card">
+                  <img src="assets/main.jpg" alt="" />
+                  <div class="veil"></div>
+                  <div class="copy">
+                    <small>Today's Bing image</small>
+                    <strong>信天翁的求偶之舞</strong>
+                    <p>1920 × 1080 · 2026-11-02</p>
+                    <button class="btn primary"><svg class="icon sm"><use href="#i-check"/></svg>立即设为壁纸</button>
+                  </div>
+                </div>
+
+                <div class="panel info-card">
+                  <div class="line"><span>当前版本</span><b>v2.1.0</b></div>
+                  <div class="line"><span>运行平台</span><b>Windows · amd64</b></div>
+                  <div class="line"><span>WebView2</span><b>已就绪</b></div>
+                  <div class="divider"></div>
+                  <div class="line"><span>今日图片</span><b>已下载</b></div>
+                  <div class="line"><span>自动任务</span><b>00:05</b></div>
+                  <div class="divider"></div>
+                  <button class="btn ghost" style="width:100%;justify-content:center;height:36px;font-size:11.5px">检查更新</button>
+                </div>
+
+                <div class="panel info-card">
+                  <div class="line"><span>存储策略</span><b>保留最近 30 天</b></div>
+                  <div class="line"><span>缩略图缓存</span><b>WebP · 480px</b></div>
+                  <div class="line"><span>清理缓存</span><b style="color:#1677ff;cursor:pointer">立即清理</b></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 04 批量下载 ================= -->
+  <section class="shot">
+    <div class="shot-label"><b>04 · 批量下载</b><span>日期区间 · 实时进度 · 下载日志</span></div>
+    <div class="frame download-frame" role="region" aria-label="04 批量下载">
+      <div class="download-bg"></div>
+      <div class="modal">
+        <div class="modal-head">
+          <div class="icon-box"><svg class="icon lg"><use href="#i-download"/></svg></div>
+          <div>
+            <h3>批量下载</h3>
+            <p>按日期区间补齐历史壁纸，Bing 接口最多提供最近 8 天。</p>
+          </div>
+          <button class="close"><svg class="icon"><use href="#i-close"/></svg></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="alert">
+            <svg class="icon sm"><use href="#i-info"/></svg>
+            <span>由于 Bing 接口限制，仅支持下载最近 8 天的图片。已存在的文件会自动跳过，不会重复下载。</span>
+          </div>
+
+          <div class="range-row">
+            <div class="field">
+              <label>开始日期</label>
+              <div class="date-input"><svg class="icon sm"><use href="#i-calendar"/></svg>2026-10-27</div>
+            </div>
+            <div class="range-sep">→</div>
+            <div class="field">
+              <label>结束日期</label>
+              <div class="date-input"><svg class="icon sm"><use href="#i-calendar"/></svg>2026-11-02</div>
+            </div>
+            <button class="btn primary"><svg class="icon sm"><use href="#i-play"/></svg>开始下载</button>
+          </div>
+
+          <div class="progress-card">
+            <div class="progress-top">
+              <span><b>正在下载</b> · 第 6 / 7 张</span>
+              <span class="count">本地已有 24 张</span>
+            </div>
+            <div class="progress-bar"><i></i></div>
+            <div class="progress-top" style="margin-top:8px">
+              <span>bing20261101.jpg</span>
+              <b>86%</b>
+            </div>
+          </div>
+
+          <div class="log-box">
+            <div class="log-head"><i></i><i></i><i></i><span>download.log</span></div>
+            <div class="log-body">
+              <div><span class="time">00:05:01</span> <span class="info">INFO</span> 开始批量下载 2026-10-27 → 2026-11-02</div>
+              <div><span class="time">00:05:02</span> <span class="ok">SUCCESS</span> bing20261027.jpg · 下载成功 · 1.8 MB</div>
+              <div><span class="time">00:05:04</span> <span class="warn">SKIP</span> bing20261028.jpg · 文件已存在</div>
+              <div><span class="time">00:05:05</span> <span class="ok">SUCCESS</span> bing20261029.jpg · 下载成功 · 2.1 MB</div>
+              <div><span class="time">00:05:07</span> <span class="ok">SUCCESS</span> bing20261030.jpg · 下载成功 · 1.9 MB</div>
+              <div><span class="time">00:05:09</span> <span class="ok">SUCCESS</span> bing20261031.jpg · 下载成功 · 2.4 MB</div>
+              <div><span class="time">00:05:11</span> <span class="ok">SUCCESS</span> bing20261101.jpg · 下载成功 · 2.0 MB</div>
+              <div><span class="time">00:05:12</span> <span class="info">INFO</span> 正在生成缩略图缓存…</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-foot">
+          <span class="hint">下载目录：~/Pictures/BingWallpaper</span>
+          <div class="right">
+            <button class="btn ghost"><svg class="icon sm"><use href="#i-folder"/></svg>打开文件夹</button>
+            <button class="btn primary">完成</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

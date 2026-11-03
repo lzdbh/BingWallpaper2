@@ -1,0 +1,45 @@
+:root {
+  --bw-primary: #1677ff;
+  --bw-primary-deep: #0958d9;
+  --bw-primary-soft: rgba(22, 119, 255, 0.12);
+  --bw-bg: #f5f7fb;
+  --bw-bg-deep: #e9eef7;
+  --bw-surface: rgba(255, 255, 255, 0.76);
+  --bw-surface-strong: rgba(255, 255, 255, 0.94);
+  --bw-surface-muted: rgba(255, 255, 255, 0.56);
+  --bw-ink: #101828;
+  --bw-ink-soft: #344054;
+  --bw-muted: #667085;
+  --bw-line: rgba(16, 24, 40, 0.08);
+  --bw-line-strong: rgba(16, 24, 40, 0.14);
+  --bw-radius-sm: 10px;
+  --bw-radius: 16px;
+  --bw-radius-lg: 22px;
+  --bw-blur: 22px;
+  --bw-shadow: 0 18px 50px rgba(16, 24, 40, 0.16);
+  --bw-shadow-soft: 0 8px 26px rgba(16, 24, 40, 0.1);
+  --bw-success: #12b76a;
+  --bw-warning: #f79009;
+  --bw-danger: #f04438;
+  --bw-font: 'Segoe UI Variable', 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Noto Sans CJK SC', 'Noto Sans', system-ui, sans-serif;
+  --bw-titlebar-height: 56px;
+  --bw-sidebar-width: 236px;
+  --bw-transition: 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+[data-theme='dark'] {
+  --bw-primary-soft: rgba(22, 119, 255, 0.2);
+  --bw-bg: #0f141c;
+  --bw-bg-deep: #0a0e14;
+  --bw-surface: rgba(18, 24, 34, 0.74);
+  --bw-surface-strong: rgba(20, 27, 38, 0.94);
+  --bw-surface-muted: rgba(18, 24, 34, 0.5);
+  --bw-ink: #f2f4f7;
+  --bw-ink-soft: #d0d5dd;
+  --bw-muted: #98a2b3;
+  --bw-line: rgba(255, 255, 255, 0.1);
+  --bw-line-strong: rgba(255, 255, 255, 0.18);
+  --bw-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
+  --bw-shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.32);
+}

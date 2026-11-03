@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Frontend build output
+dist/
+src/components.d.ts
+
+# Rust build output
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Logs and local files
+*.log
+cargo-check.log
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Local environment
+.env
+.env.local
+
+# 本地参照的上游原始代码与 AI 会话导出（不入库）
+/BingWallpaper2-master/
+/bingwallpaper2-tauri.json
+/解读_opencode_导出任务_*.md

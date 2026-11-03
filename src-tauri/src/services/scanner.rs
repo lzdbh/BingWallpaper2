@@ -591,10 +591,17 @@ mod tests {
 
     #[test]
     fn plan_skips_a_sibling_while_the_indexed_file_still_exists() {
+        // The indexed sibling must really exist on every platform, so build it in
+        // a temp dir instead of pointing at an OS file that only answers to `is_file`
+        // on Windows.
+        let root = tempfile::tempdir().unwrap();
+        let existing = root.path().join("bing20261102.jpg");
+        std::fs::write(&existing, b"jpg").unwrap();
+
         let file = scanned("2026-11-02", "bing20261102-1.jpg", 1, 1);
         let indexed = HashMap::from([(
             "2026-11-02".to_string(),
-            indexed_row("2026-11-02", "C:\\Windows\\win.ini"),
+            indexed_row("2026-11-02", &existing.to_string_lossy()),
         )]);
 
         assert_eq!(plan_file(&file, &indexed, "now"), Plan::Skip);

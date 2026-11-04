@@ -1,17 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
-import {
-  BulbOutlined,
-  CloudDownloadOutlined,
-  FolderOpenOutlined,
-  HomeOutlined,
-  InfoCircleOutlined,
-  PictureOutlined,
-  SettingOutlined,
-} from '@ant-design/icons-vue'
+import { BulbOutlined, FolderOpenOutlined, SettingOutlined } from '@ant-design/icons-vue'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { api } from '@/api'
 import { isTauri, onEvent } from '@/api/events'
@@ -39,14 +31,6 @@ const immersive = computed(() => route.meta.immersive === true)
 const pageTitle = computed(() =>
   route.meta.title ? t(String(route.meta.title)) : t('app.name'),
 )
-
-const navItems = computed(() => [
-  { name: 'home', path: '/', icon: HomeOutlined, label: t('nav.home') },
-  { name: 'gallery', path: '/gallery', icon: PictureOutlined, label: t('nav.gallery') },
-  { name: 'downloads', path: '/downloads', icon: CloudDownloadOutlined, label: t('nav.downloads') },
-  { name: 'settings', path: '/settings', icon: SettingOutlined, label: t('nav.settings') },
-  { name: 'about', path: '/about', icon: InfoCircleOutlined, label: t('nav.about') },
-])
 
 const showUpdate = ref(false)
 let unlistenClose: (() => void) | undefined
@@ -113,6 +97,10 @@ async function toggleTheme() {
   await settings.save({ theme: isDark.value ? 'light' : 'dark' })
 }
 
+function goSettings() {
+  void router.push('/settings')
+}
+
 async function retryBoot() {
   try {
     await app.bootstrap()
@@ -125,32 +113,12 @@ async function retryBoot() {
 <template>
   <div class="shell" :class="{ immersive }">
     <header class="titlebar">
-      <div v-if="immersive" class="brand drag-region">
-        <BrandMark />
-        <div class="brand-text">
-          <strong>{{ t('app.name') }}</strong>
-          <span>{{ t('app.tagline') }}</span>
-        </div>
-      </div>
-      <div v-else class="crumbs drag-region">
+      <div v-if="!immersive" class="crumbs drag-region">
         <BrandMark class="crumb-mark" />
         <span class="crumb-app">{{ t('app.name') }}</span>
         <span class="crumb-slash">/</span>
         <strong>{{ pageTitle }}</strong>
       </div>
-
-      <nav v-if="immersive" class="top-nav no-drag" aria-label="Primary">
-        <RouterLink
-          v-for="item in navItems"
-          :key="item.name"
-          :to="item.path"
-          class="top-link"
-          :class="{ active: route.name === item.name }"
-        >
-          <component :is="item.icon" />
-          <span>{{ item.label }}</span>
-        </RouterLink>
-      </nav>
 
       <div class="drag-fill" data-tauri-drag-region></div>
 
@@ -173,6 +141,16 @@ async function retryBoot() {
             @click="toggleTheme"
           >
             <BulbOutlined />
+          </button>
+        </a-tooltip>
+        <a-tooltip :title="t('nav.settings')" placement="bottom">
+          <button
+            type="button"
+            class="icon-btn"
+            :aria-label="t('nav.settings')"
+            @click="goSettings"
+          >
+            <SettingOutlined />
           </button>
         </a-tooltip>
       </div>
@@ -250,35 +228,6 @@ async function retryBoot() {
   -webkit-backdrop-filter: none;
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding-right: 6px;
-}
-
-.brand-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
-  min-width: 0;
-}
-
-.brand-text strong {
-  font-size: 13.5px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-
-.brand-text span {
-  font-size: 10.5px;
-  opacity: 0.68;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .crumbs {
   display: flex;
   align-items: center;
@@ -303,40 +252,6 @@ async function retryBoot() {
 
 .crumbs strong {
   font-size: 13px;
-  font-weight: 650;
-}
-
-.top-nav {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: 14px;
-}
-
-.top-link {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 11px;
-  border-radius: 999px;
-  color: rgba(255, 255, 255, 0.76);
-  font-size: 12.5px;
-  font-weight: 500;
-  text-decoration: none;
-  transition:
-    background var(--bw-transition),
-    color var(--bw-transition);
-}
-
-.top-link:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-  text-decoration: none;
-}
-
-.top-link.active {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
   font-weight: 650;
 }
 
@@ -440,11 +355,5 @@ async function retryBoot() {
   max-width: 320px;
   color: var(--bw-danger) !important;
   line-height: 1.6;
-}
-
-@media (max-width: 900px) {
-  .top-nav {
-    display: none;
-  }
 }
 </style>

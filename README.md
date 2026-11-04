@@ -55,7 +55,9 @@
 │   ├── src/infra/           # HTTP、SQLite、文件、平台适配
 │   ├── capabilities/        # Tauri 权限
 │   └── tauri.conf.json
+├── eslint.config.js          # 前端扁平 ESLint 配置
 ├── docs/复刻方案.md          # 原项目解读与完整复刻方案
+├── docs/手工验收清单.md      # 多平台真机验收步骤
 └── docs/mockups/            # 界面示意图与 HTML 原型
 ```
 
@@ -181,6 +183,7 @@ npm run tauri:build -- --target aarch64-unknown-linux-gnu
 ## 文档
 
 - [完整复刻方案](docs/复刻方案.md)：原项目逐模块解读、架构设计、命令与事件清单、迁移与测试计划
+- [手工验收清单](docs/手工验收清单.md)：11.2 验收标准里必须真机点的项（含各桌面环境专项与性能测量命令）
 - [HTML 界面原型](docs/mockups/ui-mockup.html)
 
 ## 许可证

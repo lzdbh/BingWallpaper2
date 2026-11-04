@@ -120,7 +120,7 @@ npm run tauri:build
 CI（`.github/workflows/`）：
 
 - `ci.yml`：push / PR 时在 **Windows(MSVC) / Ubuntu / macOS** 上运行 clippy `-D warnings`、`cargo test`、前端 build + Vitest——本机 GNU 跑不了的后端测试由 CI 实跑。
-- `release.yml`：推送 `v*` tag 时按 **Windows x64、macOS arm64、macOS x64** 三个原生 runner 打包，产出草稿 Release。
+- `release.yml`：推送 `v*` tag 时按 **Windows x64、macOS arm64、macOS x64** 三个原生 runner 打包，产出草稿 Release；正文直接取 annotated tag 的注释，所以发布用 `git tag -a` 并把更新说明写进注释。
 
 交叉编译 arm64：
 

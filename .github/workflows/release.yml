@@ -30,6 +30,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read annotated tag message as release notes
+        id: notes
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          # checkout lands on a detached HEAD, so the tag object (and its
+          # annotation) is not in the repo yet — fetch the tag explicitly.
+          git fetch --depth=1 origin "+refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+          body=$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)')
+          {
+            printf 'body<<QODER_EOF\n%s\nQODER_EOF\n' "$body"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Install Linux dependencies
         if: startsWith(matrix.runner, 'ubuntu')
         run: |
@@ -67,7 +80,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "BingWallpaper ${{ github.ref_name }}"
-          releaseBody: "See the assets below to download and install this version."
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

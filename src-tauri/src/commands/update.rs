@@ -78,9 +78,13 @@ pub async fn install_update(state: State<'_, AppState>) -> AppResult<()> {
         .await
         .map_err(updater_error)?;
 
-    // Windows hands over to the installer process; the other platforms relaunch.
-    #[cfg(not(windows))]
-    state.app.restart();
+    // Windows hands over to the installer process, which takes this one down; the
+    // other platforms relaunch. `cfg!` rather than `#[cfg]` because `restart()`
+    // diverges, and a bare `#[cfg]` call makes the trailing `Ok(())` unreachable
+    // code — fatal under CI's `-D warnings`.
+    if cfg!(not(windows)) {
+        state.app.restart();
+    }
 
     Ok(())
 }

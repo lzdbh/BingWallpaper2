@@ -107,8 +107,11 @@ npm run lint
 # 前端类型检查 + 产物构建
 npm run build
 
-# 打包当前平台安装包
+# 打包当前平台安装包（需要 TAURI_SIGNING_PRIVATE_KEY 才会产出签名更新产物）
 npm run tauri:build
+
+# 本机没有签名私钥时用它：只关掉 createUpdaterArtifacts，产出普通安装包
+npm run tauri:build:local
 ```
 
 > 1420 端口同时只能有一个 dev server。若本机另一个 Tauri 项目已占用，`npm run tauri:dev` 会连到别人的页面。绕法：另起 `npx vite --port 1421`，再用一个只写 `build.devUrl` 的临时 JSON 覆盖配置文件跑 `npm run tauri:dev -- --config dev-port.json`（内容与 `tauri.conf.json` 合并，只覆盖这一个键）。
@@ -128,7 +131,7 @@ npm run tauri:build
 CI（`.github/workflows/`）：
 
 - `ci.yml`：push / PR 时在 **Windows(MSVC) / Ubuntu / macOS** 上运行 ESLint、clippy `-D warnings`、`cargo test`、前端 build + Vitest——本机 GNU 跑不了的后端测试由 CI 实跑。
-- `release.yml`：推送 `v*` tag 时按 **Windows x64、macOS arm64、macOS x64** 三个原生 runner 打包，产出草稿 Release；正文直接取 annotated tag 的注释，所以发布用 `git tag -a` 并把更新说明写进注释。
+- `release.yml`：推送 `v*` tag 时按 **Windows x64、macOS arm64、macOS x64** 三个原生 runner 打包，产出草稿 Release；正文直接取 annotated tag 的注释，所以发布用 `git tag -a` 并把更新说明写进注释。更新包用仓库 secrets 里的 `TAURI_SIGNING_PRIVATE_KEY`（+ `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`）做 minisign 签名，并生成 `latest.json` 更新清单，因此从任意设备打的 tag 产出的包都能被客户端校验并原子安装。
 
 交叉编译 arm64：
 
@@ -161,7 +164,7 @@ npm run tauri:build -- --target aarch64-unknown-linux-gnu
 - macOS：`~/Library/Application Support/com.bingwallpaper.app`
 - Linux：`~/.local/share/com.bingwallpaper.app`
 
-网络请求仅发往 `bing.com`（图片与 `HPImageArchive` 接口）和 `api.github.com`（检查更新）。没有遥测，也不会上传本地图片。更新采用「检查 GitHub Release → 打开下载页面」，客户端不保存任何云存储密钥。
+网络请求仅发往 `bing.com`（图片与 `HPImageArchive` 接口）、`api.github.com`（检查更新）和 `github.com`（下载更新包）。没有遥测，也不会上传本地图片。更新采用「检查 GitHub Release → 应用内下载 minisign 签名包 → 校验后原子替换」，客户端只内置公钥，不保存任何云存储密钥。
 
 ## 平台支持矩阵
 

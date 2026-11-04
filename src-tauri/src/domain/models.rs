@@ -195,7 +195,7 @@ impl Settings {
             self.market
         };
         self.auto_set_time = normalize_time(&self.auto_set_time).unwrap_or_else(|| "00:05".into());
-        self.retention_days = self.retention_days.clamp(1, 365);
+        self.retention_days = self.retention_days.clamp(0, 365);
         self.image_dir = self
             .image_dir
             .map(|value| value.trim().to_string())
@@ -464,7 +464,7 @@ mod tests {
     }
 
     #[test]
-    fn normalized_fills_defaults_and_clamps() {
+    fn normalized_keeps_zero_retention_and_fills_defaults() {
         let settings = Settings {
             locale: "  ".into(),
             market: "".into(),
@@ -477,7 +477,7 @@ mod tests {
         let normalized = settings.normalized();
         assert_eq!(normalized.locale, "zh-CN");
         assert_eq!(normalized.market, "zh-CN");
-        assert_eq!(normalized.retention_days, 1);
+        assert_eq!(normalized.retention_days, 0);
         assert_eq!(normalized.auto_set_time, "00:05");
         assert_eq!(normalized.image_dir, None);
         assert_eq!(normalized.proxy, None);

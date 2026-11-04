@@ -435,7 +435,7 @@ function resetSettings() {
             </div>
             <a-input-number
               v-model:value="retention"
-              :min="1"
+              :min="0"
               :max="365"
               size="small"
               class="retention-input"

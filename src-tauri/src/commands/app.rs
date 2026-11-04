@@ -115,6 +115,9 @@ pub async fn quit_app(app: AppHandle) -> AppResult<()> {
 #[tauri::command]
 pub async fn clear_cache(state: State<'_, AppState>) -> AppResult<ClearCacheResult> {
     let settings = state.settings();
+    if settings.retention_days == 0 {
+        return Ok(ClearCacheResult::default());
+    }
     let cutoff = (chrono::Local::now() - chrono::Duration::days(settings.retention_days as i64))
         .format("%Y-%m-%d")
         .to_string();

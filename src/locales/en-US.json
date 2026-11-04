@@ -178,7 +178,7 @@
     "stable": "Stable",
     "beta": "Beta",
     "retention": "Keep images for",
-    "retentionHint": "Favorites are never cleaned up",
+    "retentionHint": "0 keeps everything; favorites are never cleaned up",
     "preview": "Today's preview",
     "storage": "Storage",
     "clear": "Clean old images",

@@ -508,6 +508,9 @@ export const mockApi: Api = {
   async clearCache(): Promise<ClearCacheResult> {
     await delay(600)
     const settings = loadSettings()
+    if (settings.retentionDays === 0) {
+      return { removed: 0, bytesFreed: 0 }
+    }
     const cutoff = dayjs().subtract(settings.retentionDays, 'day')
     const removable = images.filter(
       (image) =>

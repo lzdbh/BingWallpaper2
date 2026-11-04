@@ -178,7 +178,7 @@
     "stable": "稳定版",
     "beta": "测试版",
     "retention": "图片保留天数",
-    "retentionHint": "收藏的图片不会被清理",
+    "retentionHint": "0 表示不清理，收藏的图片也不会被清理",
     "preview": "今日壁纸预览",
     "storage": "存储策略",
     "clear": "清理旧图片",

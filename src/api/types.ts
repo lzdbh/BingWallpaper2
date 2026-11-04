@@ -126,6 +126,12 @@ export interface UpdateInfo {
   mandatory: boolean
 }
 
+export interface UpdateProgress {
+  downloaded: number
+  total: number | null
+  percent: number
+}
+
 export interface ClearCacheResult {
   removed: number
   bytesFreed: number

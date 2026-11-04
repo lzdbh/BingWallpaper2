@@ -48,6 +48,7 @@
     "checking": "Checking…",
     "upToDate": "You are up to date",
     "install": "Install update",
+    "downloading": "Downloading and verifying the update…",
     "later": "Later",
     "version": "Version",
     "platform": "Platform",

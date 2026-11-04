@@ -1,10 +1,12 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { api } from '@/api'
+import { onEvent } from '@/api/events'
 import type {
   PlatformCapabilities,
   StorageStats,
   UpdateInfo,
+  UpdateProgress,
 } from '@/api/types'
 import { useSettingsStore } from './settings'
 import { useWallpaperStore } from './wallpaper'
@@ -30,6 +32,8 @@ export const useAppStore = defineStore('app', () => {
   const update = ref<UpdateInfo | null>(null)
   const checkingUpdate = ref(false)
   const installing = ref(false)
+  const updateProgress = ref<UpdateProgress | null>(null)
+  let updateEventsBound = false
   const bootError = ref<string | null>(null)
 
   const platformLabel = computed(() => {
@@ -93,6 +97,13 @@ export const useAppStore = defineStore('app', () => {
 
   async function installUpdate() {
     installing.value = true
+    updateProgress.value = null
+    if (!updateEventsBound) {
+      updateEventsBound = true
+      await onEvent<UpdateProgress>('update://progress', (payload) => {
+        updateProgress.value = payload
+      })
+    }
     try {
       await api.installUpdate()
       update.value = null
@@ -113,6 +124,7 @@ export const useAppStore = defineStore('app', () => {
     update,
     checkingUpdate,
     installing,
+    updateProgress,
     bootError,
     platformLabel,
     bootstrap,

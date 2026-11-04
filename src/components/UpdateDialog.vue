@@ -38,6 +38,10 @@ async function install() {
         {{ t('common.lastUpdated') }}：{{ formatDate(app.update.publishedAt, locale) }}
       </p>
       <pre class="notes">{{ app.update.notes || t('common.noData') }}</pre>
+      <div v-if="app.installing" class="install-progress">
+        <a-progress :percent="app.updateProgress?.percent ?? 0" size="small" />
+        <p class="hint">{{ t('common.downloading') }}</p>
+      </div>
     </div>
     <a-empty v-else />
   </a-modal>
@@ -82,5 +86,15 @@ async function install() {
   font-size: 12px;
   line-height: 1.65;
   white-space: pre-wrap;
+}
+
+.install-progress {
+  margin-top: 2px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--bw-muted);
 }
 </style>

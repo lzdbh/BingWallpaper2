@@ -53,6 +53,7 @@ const PALETTES = [
 ]
 
 const MOCK_IMAGE_DIR = 'C:\\Users\\Demo\\Pictures\\BingWallpaper'
+const MOCK_VERSION = '2.4.0'
 const SCANNED_COUNT = 12
 
 const DEFAULT_SETTINGS: Settings = {
@@ -330,7 +331,7 @@ export const mockApi: Api = {
       settings,
       capabilities: capabilities(),
       today: images[0] ?? null,
-      version: '2.1.0',
+      version: MOCK_VERSION,
       imageDir: settings.imageDir ?? MOCK_IMAGE_DIR,
       storage: stats(),
       isFirstRun: false,
@@ -498,11 +499,29 @@ export const mockApi: Api = {
 
   async checkUpdate(): Promise<UpdateInfo | null> {
     await delay(900)
-    return null
+    // `?mockUpdate=1` surfaces a fake update so the browser preview can exercise
+    // the in-app install flow, which otherwise only exists in a Tauri build.
+    if (!new URLSearchParams(window.location.search).has('mockUpdate')) return null
+    return {
+      version: '9.9.9',
+      currentVersion: MOCK_VERSION,
+      notes: '模拟更新：用于在浏览器里验证下载进度与文案。',
+      url: 'https://github.com/lzdbh/BingWallpaper2/releases',
+      publishedAt: dayjs().toISOString(),
+      mandatory: false,
+    }
   },
 
   async installUpdate(): Promise<void> {
-    await delay(300)
+    const total = 5_460_000
+    for (let percent = 0; percent <= 100; percent += 4) {
+      mockBus.emit('update://progress', {
+        downloaded: Math.round((total * percent) / 100),
+        total,
+        percent,
+      })
+      await delay(70)
+    }
   },
 
   async clearCache(): Promise<ClearCacheResult> {

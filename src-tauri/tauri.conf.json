@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "BingWallpaper",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "identifier": "com.bingwallpaper.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -40,6 +40,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "category": "Utility",
     "shortDescription": "Bing daily wallpaper",
     "longDescription": "Automatically fetch and apply Bing's daily image as your desktop wallpaper on Windows, macOS and Linux.",
@@ -62,6 +63,14 @@
       "deb": {
         "depends": ["libwebkit2gtk-4.1-0", "libayatana-appindicator3-1"]
       }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENDRUJFRTRDMTE1MzU2RTkKUldUcFZsTVJUTzdyekZDUkVnY0phNEtTV1RaMTJueW96WjVDYmVCZmlIWnIrSDJpTGs1WG9sbkYK",
+      "endpoints": [
+        "https://github.com/lzdbh/BingWallpaper2/releases/latest/download/latest.json"
+      ]
     }
   }
 }

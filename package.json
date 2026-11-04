@@ -1,7 +1,7 @@
 {
   "name": "bingwallpaper",
   "private": true,
-  "version": "2.3.0",
+  "version": "2.4.0",
   "type": "module",
   "description": "Bing daily wallpaper for Windows, macOS and Linux",
   "scripts": {
@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "tauri:build:local": "tauri build --config src-tauri/tauri.local-build.json"
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",

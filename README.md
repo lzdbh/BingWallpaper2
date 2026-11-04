@@ -71,8 +71,8 @@
   ```powershell
   rustup default stable-x86_64-pc-windows-msvc
   ```
-- **GNU 工具链**：需要 MinGW-w64 的 `gcc` / `dlltool` / `ar`。若使用 MSYS2，请把 `C:\msys64\mingw64\bin` 加入 `PATH`，否则会出现
-  `error calling dlltool 'dlltool.exe': program not found`。
+- **GNU 工具链**：需要 MinGW-w64 的 `gcc` / `dlltool` / `ar` / `windres`。若使用 MSYS2，请把 `C:\msys64\mingw64\bin`（ucrt64 则是 `C:\msys64\ucrt64\bin`）加入 `PATH`，否则会出现
+  `error calling dlltool 'dlltool.exe': program not found`；`npm run tauri:dev` 另会报 `tauri-winres ... NotAttempted("windres")`，同一个目录缺 `windres.exe` 导致的。
 - WebView2 Runtime：Windows 10/11 通常已内置。
 
 ### macOS
@@ -99,6 +99,9 @@ npm run dev
 # 桌面端开发（真实 Rust 后端 + Vite HMR）
 npm run tauri:dev
 
+# 前端静态检查
+npm run lint
+
 # 前端类型检查 + 产物构建
 npm run build
 
@@ -106,10 +109,13 @@ npm run build
 npm run tauri:build
 ```
 
+> 1420 端口同时只能有一个 dev server。若本机另一个 Tauri 项目已占用，`npm run tauri:dev` 会连到别人的页面。绕法：另起 `npx vite --port 1421`，再用一个只写 `build.devUrl` 的临时 JSON 覆盖配置文件跑 `npm run tauri:dev -- --config dev-port.json`（内容与 `tauri.conf.json` 合并，只覆盖这一个键）。
+
 ## 测试与质量
 
 | 检查 | 命令 | 说明 |
 |---|---|---|
+| 前端静态检查 | `npm run lint` | ESLint 10 扁平配置 + `typescript-eslint` + `eslint-plugin-vue`，`--max-warnings 0` |
 | 前端单元测试 | `npm run test:unit` | Vitest + jsdom，覆盖 `utils/format`、`utils/error`、`stores/settings`、`stores/gallery`（34 用例） |
 | 前端类型检查 | `npm run build` | `vite build` + `vue-tsc --noEmit` |
 | Rust 静态检查 | `cd src-tauri && cargo clippy --all-targets -- -D warnings` | 零警告门禁 |
@@ -119,7 +125,7 @@ npm run tauri:build
 
 CI（`.github/workflows/`）：
 
-- `ci.yml`：push / PR 时在 **Windows(MSVC) / Ubuntu / macOS** 上运行 clippy `-D warnings`、`cargo test`、前端 build + Vitest——本机 GNU 跑不了的后端测试由 CI 实跑。
+- `ci.yml`：push / PR 时在 **Windows(MSVC) / Ubuntu / macOS** 上运行 ESLint、clippy `-D warnings`、`cargo test`、前端 build + Vitest——本机 GNU 跑不了的后端测试由 CI 实跑。
 - `release.yml`：推送 `v*` tag 时按 **Windows x64、macOS arm64、macOS x64** 三个原生 runner 打包，产出草稿 Release；正文直接取 annotated tag 的注释，所以发布用 `git tag -a` 并把更新说明写进注释。
 
 交叉编译 arm64：

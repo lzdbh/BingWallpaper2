@@ -229,7 +229,7 @@ async function runScan(): Promise<boolean> {
   return true
 }
 
-function stats(settings: Settings) {
+function stats() {
   return {
     count: images.length,
     favoriteCount: images.filter((i) => i.favorite).length,
@@ -287,7 +287,7 @@ async function runDownload(start: string, end: string): Promise<string> {
   void (async () => {
     let current = 0
     let success = 0
-    let failed = 0
+    const failed = 0
     let skipped = 0
     let cancelled = false
     for (const date of dates) {
@@ -332,7 +332,7 @@ export const mockApi: Api = {
       today: images[0] ?? null,
       version: '2.1.0',
       imageDir: settings.imageDir ?? MOCK_IMAGE_DIR,
-      storage: stats(settings),
+      storage: stats(),
       isFirstRun: false,
       scanning: scanRunning,
     }

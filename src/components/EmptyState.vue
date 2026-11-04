@@ -2,14 +2,11 @@
 import type { Component } from 'vue'
 import { InboxOutlined } from '@ant-design/icons-vue'
 
-withDefaults(
-  defineProps<{
-    title: string
-    hint?: string
-    icon?: Component
-  }>(),
-  {},
-)
+defineProps<{
+  title: string
+  hint?: string
+  icon?: Component
+}>()
 </script>
 
 <template>

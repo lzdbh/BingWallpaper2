@@ -34,7 +34,7 @@ async function install() {
         <span class="badge">v{{ app.update.version }}</span>
         <span class="current">{{ t('common.version') }} v{{ app.update.currentVersion }}</span>
       </div>
-      <p class="published" v-if="app.update.publishedAt">
+      <p v-if="app.update.publishedAt" class="published">
         {{ t('common.lastUpdated') }}：{{ formatDate(app.update.publishedAt, locale) }}
       </p>
       <pre class="notes">{{ app.update.notes || t('common.noData') }}</pre>

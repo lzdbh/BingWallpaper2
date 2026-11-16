@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 
+use chrono::NaiveDate;
 use rusqlite::{params, params_from_iter, Connection, OptionalExtension};
 use rusqlite::types::Value;
 
@@ -61,7 +62,7 @@ impl Db {
         let db = Self {
             conn: Mutex::new(conn),
         };
-        db.migrate()?;
+        db.migrate(Some(path))?;
         Ok(db)
     }
 
@@ -78,11 +79,11 @@ impl Db {
         let db = Self {
             conn: Mutex::new(conn),
         };
-        db.migrate()?;
+        db.migrate(None)?;
         Ok(db)
     }
 
-    fn migrate(&self) -> AppResult<()> {
+    fn migrate(&self, path: Option<&Path>) -> AppResult<()> {
         let conn = self.lock()?;
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS images (
@@ -127,6 +128,34 @@ impl Db {
                 )?;
             }
             conn.execute_batch("PRAGMA user_version = 2;")?;
+        }
+        if version < 3 {
+            // Libraries saved before dates were aligned to local time carry Bing's
+            // Pacific-time startdate, one day behind for zh-CN. Shift downloaded
+            // rows forward once; keep a backup of the pre-migration database.
+            if let Some(path) = path {
+                let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
+                let backup = path.with_extension("db.bak-v3");
+                if let Err(error) = std::fs::copy(path, &backup) {
+                    log::warn!("迁移前备份数据库失败：{error}");
+                }
+            }
+            shift_legacy_dates(&conn)?;
+            conn.execute_batch("PRAGMA user_version = 3;")?;
+        }
+        if version < 4 {
+            // v3 shifted dates but left thumbnails named after the old date, so
+            // the scanner adopted a neighbouring day's cache for the new date.
+            // Drop downloaded rows' thumbnails; the next scan rebuilds them
+            // from the right source file.
+            invalidate_downloaded_thumbs(&conn)?;
+            conn.execute_batch("PRAGMA user_version = 4;")?;
+        }
+        if version < 5 {
+            // The date shift left some file-name dates unindexed, so a scan
+            // re-imported an app-downloaded file as a second, scanned row.
+            remove_duplicate_scanned_rows(&conn)?;
+            conn.execute_batch("PRAGMA user_version = 5;")?;
         }
         Ok(())
     }
@@ -532,6 +561,109 @@ fn column_exists(conn: &Connection, table: &str, column: &str) -> AppResult<bool
     Ok(false)
 }
 
+/// Move downloaded rows one day forward, newest first so consecutive dates do
+/// not block each other. A row whose target date is already taken (e.g. by a
+/// scanned file) keeps its old date. Scanned rows are never touched.
+fn shift_legacy_dates(conn: &Connection) -> AppResult<()> {
+    let rows = {
+        let mut statement =
+            conn.prepare("SELECT id, date FROM images WHERE external = 0 ORDER BY date DESC")?;
+        let rows = statement
+            .query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)))?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
+
+    let tx = conn.unchecked_transaction()?;
+    for (id, date) in rows {
+        let Ok(parsed) = NaiveDate::parse_from_str(&date, "%Y-%m-%d") else {
+            continue;
+        };
+        let target = (parsed + chrono::Duration::days(1))
+            .format("%Y-%m-%d")
+            .to_string();
+        let occupied: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM images WHERE date = ?1)",
+            params![target],
+            |row| row.get(0),
+        )?;
+        if !occupied {
+            tx.execute(
+                "UPDATE images SET date = ?1 WHERE id = ?2",
+                params![target, id],
+            )?;
+        }
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+/// Delete the cached thumbnails of downloaded rows, both the recorded path and
+/// the deterministic `<date>.jpg` next to it, and clear the column so the next
+/// scan regenerates them from the row's own source file.
+fn invalidate_downloaded_thumbs(conn: &Connection) -> AppResult<()> {
+    let rows = {
+        let mut statement =
+            conn.prepare("SELECT id, date, thumb_path FROM images WHERE external = 0")?;
+        let rows = statement.query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
+
+    let tx = conn.unchecked_transaction()?;
+    for (id, date, thumb_path) in rows {
+        drop_thumb_cache(&date, &thumb_path);
+        tx.execute("UPDATE images SET thumb_path = '' WHERE id = ?1", params![id])?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+/// Delete a row's cached thumbnails: the recorded path and the deterministic
+/// `<date>.jpg` next to it, which may hold a neighbouring day's picture.
+fn drop_thumb_cache(date: &str, thumb_path: &str) {
+    if thumb_path.is_empty() {
+        return;
+    }
+    let recorded = Path::new(thumb_path);
+    let _ = std::fs::remove_file(recorded);
+    if let Some(parent) = recorded.parent() {
+        let _ = std::fs::remove_file(parent.join(format!("{date}.jpg")));
+    }
+}
+
+/// Drop scanned rows that point at the same file as a downloaded row: the
+/// download owns the file, the scanned copy is a re-import artefact. Their
+/// thumbnail caches go with them so a later import cannot adopt stale pixels.
+fn remove_duplicate_scanned_rows(conn: &Connection) -> AppResult<()> {
+    let rows = {
+        let mut statement = conn.prepare(
+            "SELECT id, date, thumb_path FROM images WHERE external = 1
+               AND file_path IN (SELECT file_path FROM images WHERE external = 0)",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
+
+    let tx = conn.unchecked_transaction()?;
+    for (id, date, thumb_path) in rows {
+        drop_thumb_cache(&date, &thumb_path);
+        tx.execute("DELETE FROM images WHERE id = ?1", params![id])?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -606,6 +738,123 @@ mod tests {
         db.upsert(&new_image("2026-11-05", "New", 1)).unwrap();
         db.upsert(&new_image("2026-11-03", "Mid", 1)).unwrap();
         assert_eq!(db.latest().unwrap().unwrap().date, "2026-11-05");
+    }
+
+    #[test]
+    fn legacy_date_shift_moves_downloaded_rows_forward() {
+        let db = Db::open_in_memory().unwrap();
+        db.upsert(&new_image("2026-11-14", "A", 1)).unwrap();
+        db.upsert(&new_image("2026-11-15", "B", 1)).unwrap();
+        db.upsert(&scanned("2026-11-20", "ext.jpg", 1)).unwrap();
+
+        shift_legacy_dates(&db.lock().unwrap()).unwrap();
+
+        assert_eq!(db.get_by_date("2026-11-15").unwrap().unwrap().title, "A");
+        assert_eq!(db.get_by_date("2026-11-16").unwrap().unwrap().title, "B");
+        assert!(db.get_by_date("2026-11-14").unwrap().is_none());
+        // Scanned rows keep the date derived from their file name.
+        assert!(db.get_by_date("2026-11-20").unwrap().unwrap().external);
+    }
+
+    #[test]
+    fn legacy_date_shift_skips_occupied_targets() {
+        let db = Db::open_in_memory().unwrap();
+        db.upsert(&new_image("2026-11-14", "Older", 1)).unwrap();
+        db.upsert(&new_image("2026-11-15", "Downloaded", 1)).unwrap();
+        db.upsert(&scanned("2026-11-16", "ext.jpg", 1)).unwrap();
+
+        shift_legacy_dates(&db.lock().unwrap()).unwrap();
+
+        // 11-16 belongs to a scanned file, so neither downloaded row can move.
+        assert_eq!(
+            db.get_by_date("2026-11-15").unwrap().unwrap().title,
+            "Downloaded"
+        );
+        assert_eq!(db.get_by_date("2026-11-14").unwrap().unwrap().title, "Older");
+        assert!(db.get_by_date("2026-11-16").unwrap().unwrap().external);
+    }
+
+    #[test]
+    fn migration_does_not_shift_twice() {
+        let db = Db::open_in_memory().unwrap();
+        db.upsert(&new_image("2026-11-15", "A", 1)).unwrap();
+
+        db.migrate(None).unwrap();
+
+        assert!(db.get_by_date("2026-11-15").unwrap().is_some());
+        assert!(db.get_by_date("2026-11-16").unwrap().is_none());
+    }
+
+    #[test]
+    fn duplicate_scanned_rows_are_removed_with_their_thumbs() {
+        let dir = tempfile::tempdir().unwrap();
+        let downloaded_thumb = dir.path().join("2026-11-03.jpg");
+        let duplicate_thumb = dir.path().join("2026-11-02.jpg");
+        std::fs::write(&downloaded_thumb, b"cache").unwrap();
+        std::fs::write(&duplicate_thumb, b"cache").unwrap();
+        let downloaded_path = downloaded_thumb.to_string_lossy().to_string();
+        let duplicate_path = duplicate_thumb.to_string_lossy().to_string();
+
+        let db = Db::open_in_memory().unwrap();
+        db.upsert(&NewImage {
+            thumb_path: &downloaded_path,
+            ..new_image("2026-11-03", "Downloaded", 1)
+        })
+        .unwrap();
+        db.upsert(&NewImage {
+            thumb_path: &duplicate_path,
+            ..scanned("2026-11-02", "images/x.jpg", 1)
+        })
+        .unwrap();
+
+        remove_duplicate_scanned_rows(&db.lock().unwrap()).unwrap();
+
+        assert!(db.get_by_date("2026-11-02").unwrap().is_none());
+        assert_eq!(
+            db.get_by_date("2026-11-03").unwrap().unwrap().title,
+            "Downloaded"
+        );
+        assert!(!duplicate_thumb.exists());
+        assert!(downloaded_thumb.exists());
+    }
+
+    #[test]
+    fn thumb_invalidation_deletes_caches_and_keeps_scanned_ones() {
+        let dir = tempfile::tempdir().unwrap();
+        let old_thumb = dir.path().join("2026-11-15.jpg");
+        let adopted_thumb = dir.path().join("2026-11-16.jpg");
+        let scanned_thumb = dir.path().join("2026-11-20.jpg");
+        for path in [&old_thumb, &adopted_thumb, &scanned_thumb] {
+            std::fs::write(path, b"cache").unwrap();
+        }
+        let old_path = old_thumb.to_string_lossy().to_string();
+        let scanned_path = scanned_thumb.to_string_lossy().to_string();
+
+        let db = Db::open_in_memory().unwrap();
+        db.upsert(&NewImage {
+            thumb_path: &old_path,
+            ..new_image("2026-11-16", "A", 1)
+        })
+        .unwrap();
+        db.upsert(&NewImage {
+            thumb_path: &scanned_path,
+            ..scanned("2026-11-20", "ext.jpg", 1)
+        })
+        .unwrap();
+
+        invalidate_downloaded_thumbs(&db.lock().unwrap()).unwrap();
+
+        // Both the recorded old-date cache and the deterministic new-date cache
+        // are gone, so the next scan rebuilds from the row's own source.
+        assert!(!old_thumb.exists());
+        assert!(!adopted_thumb.exists());
+        assert_eq!(db.get_by_date("2026-11-16").unwrap().unwrap().thumb_path, "");
+        // Scanned rows keep their thumbnail and record.
+        assert!(scanned_thumb.exists());
+        assert_eq!(
+            db.get_by_date("2026-11-20").unwrap().unwrap().thumb_path,
+            scanned_path
+        );
     }
 
     #[test]

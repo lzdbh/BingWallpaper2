@@ -206,7 +206,18 @@ pub fn plan_file(
     created_at: &str,
 ) -> Plan {
     match indexed.get(&file.date) {
-        None => Plan::Import(plan(file, created_at)),
+        None => {
+            let key = path_key(&file.path);
+            if indexed
+                .values()
+                .any(|row| path_key(Path::new(&row.file_path)) == key)
+            {
+                // Already in the library under another date (e.g. after the
+                // legacy date shift); importing again would duplicate the file.
+                return Plan::Skip;
+            }
+            Plan::Import(plan(file, created_at))
+        }
         Some(row) => {
             let recorded = Path::new(&row.file_path);
             if path_key(recorded) == path_key(&file.path) {
@@ -569,6 +580,24 @@ mod tests {
 
         assert_eq!(kept.len(), 1);
         assert_eq!(kept[0].date, date_from_timestamp(1_700_000_000));
+    }
+
+    #[test]
+    fn plan_skips_a_file_already_indexed_under_another_date() {
+        let file = scanned("2026-11-02", "bing20261102-1.jpg", 10, 1);
+        let mut indexed = HashMap::new();
+        indexed.insert(
+            "2026-11-03".to_string(),
+            IndexedRow {
+                date: "2026-11-03".to_string(),
+                file_path: "D:/bing_pic/bing20261102-1.jpg".to_string(),
+            },
+        );
+
+        assert!(matches!(
+            plan_file(&file, &indexed, "2026-11-03T00:00:00+08:00"),
+            Plan::Skip
+        ));
     }
 
     #[test]

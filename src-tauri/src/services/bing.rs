@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use serde::Deserialize;
 
 use crate::domain::errors::{AppError, AppResult};
@@ -68,7 +69,7 @@ impl<'a> BingClient<'a> {
             );
             match self.http.get_json::<RawResponse>(&url).await {
                 Ok(response) => {
-                    let images: Vec<BingImage> = response
+                    let mut images: Vec<BingImage> = response
                         .images
                         .into_iter()
                         .filter_map(normalize)
@@ -77,6 +78,7 @@ impl<'a> BingClient<'a> {
                         last_error = Some(AppError::Bing("接口未返回任何图片".into()));
                         continue;
                     }
+                    align_to_local(&mut images, chrono::Local::now().date_naive());
                     return Ok(images);
                 }
                 Err(error) => {
@@ -176,6 +178,31 @@ fn is_size_token(value: &str) -> bool {
     }
 }
 
+/// Bing's `startdate` is a Pacific-time calendar date, so the newest image can
+/// lag the local date by a day (zh-CN rotates at UTC 16:00, when Pacific time
+/// is still on the previous day). Anchor the newest image to local today and
+/// shift the whole list by the same offset, keeping "idx 0 = 今天" true for
+/// downloads and the gallery.
+fn align_to_local(images: &mut [BingImage], today: NaiveDate) {
+    let Some(newest) = images.iter().map(|image| image.date.as_str()).max() else {
+        return;
+    };
+    let Ok(newest) = NaiveDate::parse_from_str(newest, "%Y-%m-%d") else {
+        return;
+    };
+    let offset = (today - newest).num_days();
+    if offset == 0 {
+        return;
+    }
+    for image in images.iter_mut() {
+        if let Ok(date) = NaiveDate::parse_from_str(&image.date, "%Y-%m-%d") {
+            image.date = (date + chrono::Duration::days(offset))
+                .format("%Y-%m-%d")
+                .to_string();
+        }
+    }
+}
+
 pub fn today_string() -> String {
     chrono::Local::now().format("%Y-%m-%d").to_string()
 }
@@ -238,6 +265,43 @@ mod tests {
     }
 
     #[test]
+    fn aligns_pacific_dates_to_local_today() {
+        let mut images = vec![
+            sample_image("2026-11-15"),
+            sample_image("2026-11-14"),
+            sample_image("2026-11-13"),
+        ];
+        let today = NaiveDate::from_ymd_opt(2026, 11, 16).unwrap();
+        align_to_local(&mut images, today);
+        assert_eq!(images[0].date, "2026-11-16");
+        assert_eq!(images[1].date, "2026-11-15");
+        assert_eq!(images[2].date, "2026-11-14");
+    }
+
+    #[test]
+    fn alignment_is_a_noop_when_dates_already_match() {
+        let mut images = vec![sample_image("2026-11-16"), sample_image("2026-11-15")];
+        let today = NaiveDate::from_ymd_opt(2026, 11, 16).unwrap();
+        align_to_local(&mut images, today);
+        assert_eq!(images[0].date, "2026-11-16");
+        assert_eq!(images[1].date, "2026-11-15");
+    }
+
+    #[test]
+    fn alignment_shifts_backwards_for_timezones_behind_pacific() {
+        let mut images = vec![sample_image("2026-11-16")];
+        let today = NaiveDate::from_ymd_opt(2026, 11, 15).unwrap();
+        align_to_local(&mut images, today);
+        assert_eq!(images[0].date, "2026-11-15");
+    }
+
+    #[test]
+    fn alignment_handles_empty_list() {
+        let today = NaiveDate::from_ymd_opt(2026, 11, 16).unwrap();
+        align_to_local(&mut [], today);
+    }
+
+    #[test]
     fn builds_image_urls_for_each_size() {
         let image = sample_image("2026-11-02");
         assert_eq!(
@@ -268,10 +332,10 @@ mod tests {
         );
     }
 
-    fn bing_body() -> serde_json::Value {
+    fn bing_body(startdate: &str) -> serde_json::Value {
         serde_json::json!({
             "images": [{
-                "startdate": "20261102",
+                "startdate": startdate,
                 "url": "/th?id=OHR.Test_ZH-CN123_1920x1080.jpg&rf=1",
                 "urlbase": "/th?id=OHR.Test_ZH-CN123",
                 "copyright": "© Test",
@@ -279,6 +343,14 @@ mod tests {
                 "title": "Test title"
             }]
         })
+    }
+
+    fn compact(date: NaiveDate) -> String {
+        date.format("%Y%m%d").to_string()
+    }
+
+    fn dashed(date: NaiveDate) -> String {
+        date.format("%Y-%m-%d").to_string()
     }
 
     async fn mock_server(body: ResponseTemplate) -> MockServer {
@@ -293,13 +365,15 @@ mod tests {
 
     #[tokio::test]
     async fn fetch_parses_normal_response() {
-        let server = mock_server(ResponseTemplate::new(200).set_body_json(bing_body())).await;
+        let today = chrono::Local::now().date_naive();
+        let body = bing_body(&compact(today - chrono::Duration::days(1)));
+        let server = mock_server(ResponseTemplate::new(200).set_body_json(body)).await;
         let http = HttpClient::new(None).unwrap();
         let client = BingClient::with_hosts(&http, vec![server.uri()]);
 
         let images = client.fetch("zh-CN").await.unwrap();
         assert_eq!(images.len(), 1);
-        assert_eq!(images[0].date, "2026-11-02");
+        assert_eq!(images[0].date, dashed(today));
         assert_eq!(images[0].url_base, "/th?id=OHR.Test_ZH-CN123");
         assert_eq!(images[0].title, "Test title");
         assert_eq!(images[0].copyright, "© Test");
@@ -307,12 +381,26 @@ mod tests {
 
     #[tokio::test]
     async fn fetch_latest_returns_first_image() {
-        let server = mock_server(ResponseTemplate::new(200).set_body_json(bing_body())).await;
+        let today = chrono::Local::now().date_naive();
+        let body = bing_body(&compact(today - chrono::Duration::days(1)));
+        let server = mock_server(ResponseTemplate::new(200).set_body_json(body)).await;
         let http = HttpClient::new(None).unwrap();
         let client = BingClient::with_hosts(&http, vec![server.uri()]);
 
         let image = client.fetch_latest("zh-CN").await.unwrap();
-        assert_eq!(image.date, "2026-11-02");
+        assert_eq!(image.date, dashed(today));
+    }
+
+    #[tokio::test]
+    async fn fetch_keeps_dates_when_newest_is_already_today() {
+        let today = chrono::Local::now().date_naive();
+        let server =
+            mock_server(ResponseTemplate::new(200).set_body_json(bing_body(&compact(today)))).await;
+        let http = HttpClient::new(None).unwrap();
+        let client = BingClient::with_hosts(&http, vec![server.uri()]);
+
+        let image = client.fetch_latest("zh-CN").await.unwrap();
+        assert_eq!(image.date, dashed(today));
     }
 
     #[tokio::test]

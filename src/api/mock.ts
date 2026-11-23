@@ -53,7 +53,7 @@ const PALETTES = [
 ]
 
 const MOCK_IMAGE_DIR = 'C:\\Users\\Demo\\Pictures\\BingWallpaper'
-const MOCK_VERSION = '2.5.1'
+const MOCK_VERSION = '2.5.2'
 const SCANNED_COUNT = 12
 
 const DEFAULT_SETTINGS: Settings = {

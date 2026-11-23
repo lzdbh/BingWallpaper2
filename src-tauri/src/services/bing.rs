@@ -18,6 +18,8 @@ struct RawImage {
     #[serde(default)]
     startdate: String,
     #[serde(default)]
+    fullstartdate: String,
+    #[serde(default)]
     url: String,
     #[serde(default)]
     urlbase: String,
@@ -69,6 +71,13 @@ impl<'a> BingClient<'a> {
             );
             match self.http.get_json::<RawResponse>(&url).await {
                 Ok(response) => {
+                    // `fullstartdate` pins the exact UTC instant an image went
+                    // live, so its local date is stable no matter when we ask.
+                    // Only responses without it need the clock-based fallback.
+                    let has_instant = response
+                        .images
+                        .iter()
+                        .any(|raw| parse_full_start(&raw.fullstartdate).is_some());
                     let mut images: Vec<BingImage> = response
                         .images
                         .into_iter()
@@ -78,7 +87,9 @@ impl<'a> BingClient<'a> {
                         last_error = Some(AppError::Bing("接口未返回任何图片".into()));
                         continue;
                     }
-                    align_to_local(&mut images, chrono::Local::now().date_naive());
+                    if !has_instant {
+                        align_to_local(&mut images, chrono::Local::now().date_naive());
+                    }
                     return Ok(images);
                 }
                 Err(error) => {
@@ -111,7 +122,13 @@ pub fn image_url(image: &BingImage, size: ImageSize) -> String {
 }
 
 fn normalize(raw: RawImage) -> Option<BingImage> {
-    let date = parse_date(&raw.startdate)?;
+    let date = match parse_full_start(&raw.fullstartdate) {
+        Some(instant) => instant
+            .with_timezone(&chrono::Local)
+            .format("%Y-%m-%d")
+            .to_string(),
+        None => parse_date(&raw.startdate)?,
+    };
     let url_base = if raw.urlbase.is_empty() {
         strip_query(&raw.url)
     } else {
@@ -133,6 +150,16 @@ fn normalize(raw: RawImage) -> Option<BingImage> {
     })
 }
 
+/// `202611221600` -> the UTC instant 2026-11-22 16:00, when the image went live.
+fn parse_full_start(value: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+    let value = value.trim();
+    if value.len() != 12 || !value.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    let naive = chrono::NaiveDateTime::parse_from_str(value, "%Y%m%d%H%M").ok()?;
+    Some(naive.and_utc())
+}
+
 /// `20261102` -> `2026-11-02`
 fn parse_date(value: &str) -> Option<String> {
     let value = value.trim();
@@ -150,7 +177,7 @@ fn parse_date(value: &str) -> Option<String> {
 /// Drop the extra parameters and the `_1920x1080.jpg` suffix so a size can be
 /// appended again. The id itself may contain underscores, so only a trailing
 /// `_WxH.jpg` / `_UHD.jpg` token is removed.
-fn strip_query(url: &str) -> String {
+pub(crate) fn strip_query(url: &str) -> String {
     let head = url.split('&').next().unwrap_or(url);
     if let Some(dot) = head.rfind(".jpg") {
         let stem = &head[..dot];
@@ -178,11 +205,10 @@ fn is_size_token(value: &str) -> bool {
     }
 }
 
-/// Bing's `startdate` is a Pacific-time calendar date, so the newest image can
-/// lag the local date by a day (zh-CN rotates at UTC 16:00, when Pacific time
-/// is still on the previous day). Anchor the newest image to local today and
-/// shift the whole list by the same offset, keeping "idx 0 = 今天" true for
-/// downloads and the gallery.
+/// Fallback for responses without `fullstartdate`: anchor the newest image to
+/// local today and shift the whole list by the same offset. The real API pins
+/// dates through `fullstartdate`, so a stale list near midnight cannot be
+/// mistaken for today's rotation.
 fn align_to_local(images: &mut [BingImage], today: NaiveDate) {
     let Some(newest) = images.iter().map(|image| image.date.as_str()).max() else {
         return;
@@ -231,6 +257,20 @@ mod tests {
     fn parses_dates() {
         assert_eq!(parse_date("20261102").as_deref(), Some("2026-11-02"));
         assert_eq!(parse_date("2026-11-02"), None);
+    }
+
+    #[test]
+    fn parses_full_start_instants() {
+        let instant = parse_full_start("202611221600").unwrap();
+        assert_eq!(
+            instant,
+            chrono::DateTime::parse_from_rfc3339("2026-11-22T16:00:00Z")
+                .unwrap()
+                .to_utc()
+        );
+        assert!(parse_full_start("20261122").is_none());
+        assert!(parse_full_start("20261122160").is_none());
+        assert!(parse_full_start("").is_none());
     }
 
     #[test]
@@ -389,6 +429,24 @@ mod tests {
 
         let image = client.fetch_latest("zh-CN").await.unwrap();
         assert_eq!(image.date, dashed(today));
+    }
+
+    #[tokio::test]
+    async fn fetch_labels_dates_from_fullstartdate() {
+        let mut body = bing_body("20261122");
+        body["images"][0]["fullstartdate"] = serde_json::json!("202611221600");
+        let server = mock_server(ResponseTemplate::new(200).set_body_json(body)).await;
+        let http = HttpClient::new(None).unwrap();
+        let client = BingClient::with_hosts(&http, vec![server.uri()]);
+
+        // The label depends only on the instant, not on when the fetch runs.
+        let expected = parse_full_start("202611221600")
+            .unwrap()
+            .with_timezone(&chrono::Local)
+            .format("%Y-%m-%d")
+            .to_string();
+        let image = client.fetch_latest("zh-CN").await.unwrap();
+        assert_eq!(image.date, expected);
     }
 
     #[tokio::test]

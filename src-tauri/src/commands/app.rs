@@ -14,6 +14,16 @@ pub async fn get_bootstrap_state(state: State<'_, AppState>) -> AppResult<Bootst
     let settings = state.settings();
     let capabilities = state.backend.capabilities();
 
+    // Libraries touched by older builds may hold the same picture twice or
+    // under the wrong date; repair what the 8-day window still covers.
+    match state.library().reconcile(&settings.market).await {
+        Ok(true) => {
+            let _ = state.app.emit("library://changed", ());
+        }
+        Ok(false) => {}
+        Err(error) => log::warn!("启动日期对账失败：{error}"),
+    }
+
     let today = match state.db.get_by_date(&AppState::now_string())? {
         Some(meta) if Path::new(&meta.file_path).is_file() => Some(meta),
         _ => match state

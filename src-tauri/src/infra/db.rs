@@ -44,6 +44,15 @@ pub struct ThumbRow {
     pub thumb_path: String,
 }
 
+/// A downloaded (non-scanned) row with the URL recorded for its picture.
+pub struct UrlRow {
+    pub id: i64,
+    pub date: String,
+    pub url: String,
+    pub file_path: String,
+    pub thumb_path: String,
+}
+
 pub struct Db {
     conn: Mutex<Connection>,
 }
@@ -156,6 +165,12 @@ impl Db {
             // re-imported an app-downloaded file as a second, scanned row.
             remove_duplicate_scanned_rows(&conn)?;
             conn.execute_batch("PRAGMA user_version = 5;")?;
+        }
+        if version < 6 {
+            // Builds without the scanner's path guard could re-create those
+            // duplicates after v5 already ran; clean up once more.
+            remove_duplicate_scanned_rows(&conn)?;
+            conn.execute_batch("PRAGMA user_version = 6;")?;
         }
         Ok(())
     }
@@ -301,6 +316,40 @@ impl Db {
             items.push(row?);
         }
         Ok(items)
+    }
+
+    /// Downloaded rows that carry the URL of their picture, newest first.
+    pub fn downloaded_rows(&self) -> AppResult<Vec<UrlRow>> {
+        let conn = self.lock()?;
+        let mut statement = conn.prepare(
+            "SELECT id, date, url, file_path, thumb_path FROM images
+              WHERE external = 0 AND url != ''
+              ORDER BY date DESC",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok(UrlRow {
+                id: row.get::<_, i64>(0)?,
+                date: row.get(1)?,
+                url: row.get(2)?,
+                file_path: row.get(3)?,
+                thumb_path: row.get(4)?,
+            })
+        })?;
+        let mut items = Vec::new();
+        for row in rows {
+            items.push(row?);
+        }
+        Ok(items)
+    }
+
+    /// Move a row to another date; the caller keeps files and thumbnails in sync.
+    pub fn set_date(&self, id: i64, date: &str) -> AppResult<bool> {
+        let conn = self.lock()?;
+        let updated = conn.execute(
+            "UPDATE images SET date = ?1 WHERE id = ?2",
+            params![date, id],
+        )?;
+        Ok(updated > 0)
     }
 
     /// Record freshly built thumbnails in one transaction; the worker batches
